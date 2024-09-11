@@ -179,6 +179,8 @@ export const MediaView = () => {
 
   console.log('Media object', current, showDetails);
 
+  const sphericalViewer = isImage ? current.tags && current.tags.includes('Spherical') : false;
+
   return (
     <>
       <SingleTagDialogProvider>
@@ -188,10 +190,13 @@ export const MediaView = () => {
               {!hideNavigation &&
                 <MediaNav index={index} current={current} prev={prev} next={next} listLocation={listLocation} showNavigation={showNavigation} dispatch={dispatch} />
               }
-              {isImage &&
+              {isImage && !sphericalViewer &&
                 <Zoomable key={key} childWidth={current.width} childHeight={current.height} onSwipe={onSwipe}>
                   <MediaViewImage key={key} media={current} next={next} prev={prev} showDetails={showDetails}/>
                 </Zoomable>
+              }
+              {isImage && sphericalViewer &&
+                <MediaViewImage key={key} media={current} next={next} prev={prev} showDetails={showDetails}/>
               }
               {isVideo &&
                 <MediaViewVideo key={key} media={current} next={next} prev={prev} dispatch={dispatch}/>
