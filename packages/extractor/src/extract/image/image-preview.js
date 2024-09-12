@@ -1,8 +1,7 @@
 import Logger from '@home-gallery/logger'
+import { toPlugin } from '../pluginUtils.js'
 
-import { toPlugin } from '../pluginUtils.js';
-
-const log = Logger('extractor.image.preview');
+const log = Logger('extractor.image.preview')
 
 const rawPreviewSuffix = 'raw-preview.jpg'
 
@@ -121,7 +120,13 @@ function imagePreview(storage, createImagePreviews, previewSizes) {
     }
 
     const size = getMaxImageSizeBy(entry.meta.rawPreviewExif) || getMaxImageSizeBy(entry.meta.exif) || defaultMaxSize
-    const resizePreviewSizes = previewSizes.filter(s => s <= size)
+
+    // If spherical, include full max size 
+    if (entry.filename.toLowerCase().includes('.spherical')) {
+      previewSizes = [size].concat(previewSizes);
+    }
+
+    const resizePreviewSizes = previewSizes.filter(s => s <= size);
 
     return createImagePreviews(entry, src, resizePreviewSizes)
       .then(createdSizes => {

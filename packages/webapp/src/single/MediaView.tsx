@@ -91,6 +91,8 @@ export const MediaView = () => {
   const current = entries[index];
   const prev = entries[index - 1];
   const next = entries[index + 1];
+  
+  console.log('current image', current);
 
   const isImage = current && (current.type === 'image' || current.type === 'rawImage');
   const isVideo = current && (current.type === 'video')

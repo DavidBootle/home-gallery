@@ -21,4 +21,13 @@ export const getHigherPreviewUrl = (previews, size) => {
   return `files/${preview}`
 }
 
+export const getHighestPreviewUrl = (previews, size) => {
+  const preview = previews[0];
+  if (!preview) {
+    return getLowerPreviewUrl(previews, size)
+  }
+  return `files/${preview}`;
+
+}
+
 export const getWidthFactor = (width, height) => width >= height ? 1 : height / (width || 1)

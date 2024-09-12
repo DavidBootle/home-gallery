@@ -3,13 +3,12 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReactPhotoSphereViewer } from "react-photo-sphere-viewer";
 
-import { getLowerPreviewUrl, getHigherPreviewUrl } from '../utils/preview'
+import { getLowerPreviewUrl, getHigherPreviewUrl, getHighestPreviewUrl } from '../utils/preview'
 import { usePreviewSize } from "./usePreviewSize";
 import { useClientRect } from '../utils/useClientRect'
 
 export const MediaViewImage = (props) => {
   const imgRef = useRef<HTMLImageElement>();
-  const photoSphereViewer = useRef<HTMLDivElement>();
   const imgRect = useClientRect(imgRef);
   const [faceRects, setFaceRects] = useState([]);
   const [objectRects, setObjectRects] = useState([]);
@@ -17,9 +16,10 @@ export const MediaViewImage = (props) => {
   const { id, shortId, previews, faces, objects, tags } = props.media;
   const navigate = useNavigate();
   const previewSize = usePreviewSize();
+  const showSphericalViewer = tags ? tags.includes('Spherical') : false;
 
-  const smallUrl = getLowerPreviewUrl(previews, previewSize / 4)
-  const largeUrl = getHigherPreviewUrl(previews, previewSize)
+  const smallUrl = getLowerPreviewUrl(previews, previewSize / 4);
+  const largeUrl = showSphericalViewer ? getHighestPreviewUrl(previews, previewSize) : getHigherPreviewUrl(previews, previewSize);
   const [src, setSrc] = useState('');
 
   useEffect(() => {
@@ -87,9 +87,7 @@ export const MediaViewImage = (props) => {
         </div>
       );
     }))
-  }, [imgRef, imgRect, src, showDetails])
-
-  const showSphericalViewer = tags ? tags.includes('Spherical') : false;
+  }, [imgRef, imgRect, src, showDetails]);
 
   return (
     <>
@@ -97,7 +95,7 @@ export const MediaViewImage = (props) => {
         { showSphericalViewer &&
           <div className="absolute object-contain w-full h-full -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2">
             <ReactPhotoSphereViewer
-              src={src}
+              src={largeUrl}
               height={"100vh"}
               width={"100%"}
             ></ReactPhotoSphereViewer>
