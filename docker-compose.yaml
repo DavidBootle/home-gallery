@@ -1,9 +1,9 @@
 services:
   api:
     # custom build via
-    build: packages/api-server
-    image: davidbootle/photogalleryapi:v1
-    # image: xemle/home-gallery-api-server
+    # build: packages/api-server
+    # image: davidbootle/photogalleryapi:v1
+    image: xemle/home-gallery-api-server
     environment:
       # TensorflowJS backends
       # - cpu: slowest and best support
@@ -12,8 +12,6 @@ services:
       #- BACKEND=cpu
       - BACKEND=wasm
       #- BACKEND=node
-    volumes:
-     - ./data/Pictures:/data/Pictures
   gallery:
     # custom build via
     build: .
