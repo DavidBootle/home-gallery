@@ -76,7 +76,8 @@ export function createApp(context) {
     const filename = req.params.filename;
 
     if (!filename) {
-      res.sendStatus(500);
+      res.sendStatus(404);
+      return;
     }
     
     // decode URI to get standard characters, including spaces
@@ -86,8 +87,11 @@ export function createApp(context) {
    const decodedSafeName = decodedName.substring(decodedName.lastIndexOf('/') + 1);
     
     res.sendFile(`/data/Pictures/${decodedSafeName}`, (err) => {
-      res.statusCode(500);
-      res.send(`Error occurred accessing file: ${err}`);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.send(`Error occurred accessing file: ${err}`);
+      }
+      return;
     })
 
   });
