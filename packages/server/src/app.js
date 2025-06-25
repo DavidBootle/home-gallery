@@ -50,6 +50,7 @@ export function createApp(context) {
   app.use(getAuthMiddleware(config))
 
   app.use('/files', express.static(config.storage.dir, {index: false, maxAge: '2d', immutable: true}));
+  // app.use('/rawimage', express.static(config.sources.dir, {index: false, maxAge: '2d', immutable: true}))
   app.use(bodyParser.json({limit: '1mb'}))
 
   const { read: readEvents, push: pushEvent, stream, getEvents } = eventsApi(context, config.events.file);
@@ -61,11 +62,35 @@ export function createApp(context) {
   app.post('/api/events', pushEvent);
   app.get('/api/database.json', readDatabase);
   app.get('/api/database/tree/:hash', readTree);
+  app.get('/api/config', (req, res) => {
+    res.json(config);
+  });
 
   if (config.server.remoteConsoleToken) {
     const { console } = debugApi({remoteConsoleToken: config.server?.remoteConsoleToken})
     app.post('/api/debug/console', console);
   }
+
+  // add direct link to download raw photos
+  app.get('/api/rawphoto/:filename', (req, res) => {
+    const filename = req.params.filename;
+
+    if (!filename) {
+      res.sendStatus(500);
+    }
+    
+    // decode URI to get standard characters, including spaces
+    const decodedName = decodeURI(filename);
+
+    // remove all preceding file elements to avoid a get api having full access to all files on the server
+   const decodedSafeName = decodedName.substring(decodedName.lastIndexOf('/') + 1);
+    
+    res.sendFile(`/data/Pictures/${decodedSafeName}`, (err) => {
+      res.statusCode(500);
+      res.send(`Error occurred accessing file: ${err}`);
+    })
+
+  });
 
   // deprecated
   app.get('/api/database', readDatabase);
