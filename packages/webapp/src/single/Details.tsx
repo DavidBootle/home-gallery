@@ -136,7 +136,7 @@ export const Details = ({entry, dispatch}) => {
               <FontAwesomeIcon icon={icons.faIdCard} className="text-gray-300"/>
             </div>
             <div>
-              <p>{mainFilename}</p>
+              <a href={`/api/rawphoto/${encodeURI(mainFilename)}`}><p>{mainFilename}</p></a>
               <p>{simpleSearchLink(entry.type, 'type', entry.type)} {entry.id.substring(0, 7)}</p>
               <p>{entry.duration > 0 && (
                 <>{humanizeDuration(entry.duration)}, </>
