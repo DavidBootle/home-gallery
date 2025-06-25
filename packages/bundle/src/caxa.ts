@@ -37,7 +37,7 @@ const findStub = async (platform: string) => {
 }
 
 const copy = async (src: Readable, dst: string, appending: boolean = true) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve: any, reject) => {
     src
       .pipe(createWriteStream(dst, { flags: appending ? 'a' : 'w'}))
       .on('finish', resolve)
