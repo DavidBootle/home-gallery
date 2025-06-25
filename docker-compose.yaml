@@ -1,9 +1,9 @@
-version: "3.9"
 services:
   api:
     # custom build via
-    #build: packages/api-server
-    image: xemle/home-gallery-api-server
+    build: packages/api-server
+    image: davidbootle/photogalleryapi:v1
+    # image: xemle/home-gallery-api-server
     environment:
       # TensorflowJS backends
       # - cpu: slowest and best support
@@ -12,10 +12,12 @@ services:
       #- BACKEND=cpu
       - BACKEND=wasm
       #- BACKEND=node
+    volumes:
+     - ./data/Pictures:/data/Pictures
   gallery:
     # custom build via
-    #build: .
-    image: xemle/home-gallery
+    build: .
+    image: davidbootle/photogallery:v2
     environment:
       - GALLERY_API_SERVER=http://api:3000
       - GALLERY_API_SERVER_CONCURRENT=1 # for SoC devices like Rasperry Pi. Use 5 otherwise
@@ -27,9 +29,9 @@ services:
     volumes:
       - ./data:/data
       # Mount your media directories below /data
-      - ${HOME}/Pictures:/data/Pictures
+      - ./data/Pictures:/data/Pictures
     ports:
-      - "3000:3000"
+      - "7070:3000"
     user: "${CURRENT_USER}"
     entrypoint: ['node', '/app/gallery.js']
     command: ['run', 'server']
