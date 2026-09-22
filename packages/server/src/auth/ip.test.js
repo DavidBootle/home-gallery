@@ -56,3 +56,10 @@ t.test('Allow default local network', t => {
   t.equal(isWhitelistIp(rules, '128.0.0.1'), false)
   t.end()
 })
+
+t.test('Deny on fallback', t => {
+  const rules = rules2WhitelistRules([{type: 'allow', value: '192.168.0.1'}])
+  t.equal(isWhitelistIp(rules, '192.168.0.1'), true)
+  t.equal(isWhitelistIp(rules, '192.168.0.2'), false)
+  t.end()
+})

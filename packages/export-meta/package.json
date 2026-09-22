@@ -8,10 +8,10 @@
     "dist"
   ],
   "scripts": {
-    "clean": "rimraf dist",
-    "build": "cpy \"src/**/!(*.test.js)\" dist",
+    "clean": "rimraf dist *.tsbuildinfo",
+    "build": "dev-cli build",
     "test": "tap ",
-    "watch": "onchange -d 1000 \"src/**\" -- npm run build",
+    "watch": "dev-cli build --watch",
     "watch:test": "tap repl w"
   },
   "keywords": [
@@ -34,6 +34,9 @@
     "@home-gallery/database": "file:../database",
     "@home-gallery/events": "file:../events",
     "@home-gallery/logger": "file:../logger",
-    "exiftool-vendored": "^24.2.0"
+    "exiftool-vendored": "^35.20.0"
+  },
+  "devDependencies": {
+    "@home-gallery/dev-tools": "file:../dev-tools"
   }
 }

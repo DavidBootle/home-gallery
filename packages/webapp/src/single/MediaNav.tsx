@@ -4,14 +4,18 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import * as icons from '@fortawesome/free-solid-svg-icons'
 
 import { useSearchStore } from "../store/search-store";
+import { useAppConfig } from "../config/useAppConfig";
 
 import { getHigherPreviewUrl, getLowerPreviewUrl } from '../utils/preview'
 import { usePreviewSize } from "./usePreviewSize";
 import { classNames } from '../utils/class-names'
+import { MediaViewDisableFlags } from "./MediaViewPage";
 
 export const MediaNav = ({current, prev, next, listLocation, showNavigation, dispatch}) => {
   const query = useSearchStore(state => state.query);
   const previewSize = usePreviewSize()
+  const appConfig = useAppConfig()
+  const diabledFlags = appConfig.pages?.mediaView?.disabled || [] as MediaViewDisableFlags
 
   const loadImage = async (url: string | false) => {
     return new Promise((resolve) => {
@@ -46,56 +50,62 @@ export const MediaNav = ({current, prev, next, listLocation, showNavigation, dis
   }, [prev, next]);
 
   const itemClass = "md:opacity-40 hover:opacity-100 hover:cursor-pointer"
-  const buttonClass = "block flex items-center justify-center rounded w-8 h-8 md:w-12 md:h-12"
-  const buttonBgClass = "bg-gray-400/50 md:bg-gray-400/40"
+  const buttonClass = "block flex items-center justify-center rounded w-8 h-8 md:w-12 md:h-12 bg-gray-400/60 md:bg-gray-400/70"
   const iconClass = "md:text-2xl text-gray-800"
 
   const hasGeo = current?.latitude && current?.longitude && current.latitude != 0 && current.longitude != 0
 
   return (
     <>
-      <div className={classNames('absolute z-10 top-4 right-4 flex gap-2')}>
-        <a onClick={() => dispatch({type: 'list'})} className={classNames(buttonClass, itemClass, 'bg-transparent hover:bg-gray-400/40')} title="Show media stream (ESC)">
-          <FontAwesomeIcon icon={icons.faXmark} className={iconClass}/>
-        </a>
+      <div className={classNames('absolute z-10 top-4 right-4 flex gap-2', itemClass)}>
+        {!diabledFlags?.includes('nav') && 
+          <a onClick={() => dispatch({type: 'list'})} className={classNames(buttonClass)} title="Show media stream (ESC)">
+            <FontAwesomeIcon icon={icons.faXmark} className={iconClass}/>
+          </a>
+        }
       </div>
-      { prev &&
+      {!diabledFlags?.includes('nav') && prev &&
         <div className={classNames('absolute z-10 left-4 top-1/2 -translate-y-1/2', itemClass)}>
-          <a onClick={() => dispatch({type: 'prev'})} className={classNames(buttonClass, buttonBgClass)} title="Show previous media (left arrow)">
+          <a onClick={() => dispatch({type: 'prev'})} className={classNames(buttonClass)} title="Show previous media (left arrow)">
             <FontAwesomeIcon icon={icons.faChevronLeft} className={iconClass}/>
           </a>
         </div>
       }
-      { next &&
+      {!diabledFlags?.includes('nav') && next &&
         <div className={classNames('absolute z-10 right-4 top-1/2 -translate-y-1/2', itemClass)}>
-          <a onClick={() => dispatch({type: 'next'})} className={classNames(buttonClass, buttonBgClass)} title="Show next media (right arrow)">
+          <a onClick={() => dispatch({type: 'next'})} className={classNames(buttonClass)} title="Show next media (right arrow)">
             <FontAwesomeIcon icon={icons.faChevronRight} className={iconClass}/>
           </a>
         </div>
       }
       <div className={classNames('absolute z-10 bottom-4 left-1/2 -translate-x-1/2 flex gap-2')}>
-        { listLocation &&
-          <a onClick={() => dispatch({type: 'list'})} className={classNames(buttonClass, buttonBgClass, itemClass)} title="Show media stream (ESC)">
+        {!diabledFlags.includes('nav') && listLocation &&
+          <a onClick={() => dispatch({type: 'list'})} className={classNames(buttonClass, itemClass)} title="Show media stream (ESC)">
             <FontAwesomeIcon icon={icons.faTh} className={iconClass}/>
           </a>
         }
-        { hasGeo &&
-          <a onClick={() => dispatch({type: 'map'})} className={classNames(buttonClass, buttonBgClass, itemClass)} title="Show map of entry (m)">
+        {!diabledFlags.includes('map') && hasGeo &&
+          <a onClick={() => dispatch({type: 'map'})} className={classNames(buttonClass, itemClass)} title="Show map of entry (m)">
             <FontAwesomeIcon icon={icons.faMap} className={iconClass}/>
           </a>
         }
-        { current?.similarityHash &&
-          <a onClick={() => dispatch({type: 'similar'})} className={classNames(buttonClass, buttonBgClass, itemClass)} title="Show similar images (s)">
+        {!diabledFlags.includes('similar') && current?.similarityHash &&
+          <a onClick={() => dispatch({type: 'similar'})} className={classNames(buttonClass, itemClass)} title="Show similar images (s)">
             <FontAwesomeIcon icon={icons.faSeedling} className={iconClass}/>
           </a>
         }
-        { query.type != 'none' &&
-          <a onClick={() => dispatch({type: 'chronology'})} className={classNames(buttonClass, buttonBgClass, itemClass)} title="Show chronology (c)">
+        {!appConfig.pages?.disabled?.includes('date') && query.type != 'none' &&
+          <a onClick={() => dispatch({type: 'chronology'})} className={classNames(buttonClass, itemClass)} title="Show chronology (c)">
             <FontAwesomeIcon icon={icons.faClock} className={iconClass}/>
           </a>
         }
-        { current &&
-          <a onClick={() => dispatch({type: 'toggleDetails'})} className={classNames(buttonClass, buttonBgClass, itemClass)} title="Show detail info (i)">
+        {!diabledFlags.includes('annotation') && current && (current.faces?.length > 0 || current.objects?.length > 0) &&
+          <a onClick={() => dispatch({type: 'toggleAnnotations'})} className={classNames(buttonClass, itemClass)} title="Show object and face annotations (a)">
+            <FontAwesomeIcon icon={icons.faUsersViewfinder} className={iconClass}/>
+          </a>
+        }
+        {!diabledFlags.includes('detail') && current &&
+          <a onClick={() => dispatch({type: 'toggleDetails'})} className={classNames(buttonClass, itemClass)} title="Show detail info (i)">
             <FontAwesomeIcon icon={icons.faInfo} className={iconClass}/>
           </a>
         }
@@ -103,4 +113,3 @@ export const MediaNav = ({current, prev, next, listLocation, showNavigation, dis
     </>
   )
 }
-

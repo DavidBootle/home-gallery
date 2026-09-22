@@ -7,8 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- server: Escape social media title and description agains injections
+- server: Fix social media dimension
+
+### Changed
+
+- server: Add server.trustProxy option and disable proxy trust by default
+
+## [1.21.0] - 2026-03-01
+
+### Changed
+
+- Raise node to v24
+- webapp: Use vite as build tool
+
+### Fixed
+
+- server: Fix arbitrary file access via source api
+- webapp: Fix PWA settings with downloadable sources
+- webapp: Fix custom prefix path with vite build
+- cast: Fix command
+
+## [1.20.0] - 2025-08-14
+
 ### Added
 
+- server: Add option flag --import-sources
+
+### Changed
+
+- webapp: Load offline db in chronlogical order, latest first
+- webapp: Improve offline db performance
+
+### Fixed
+
+- webapp: Fix source download with prefix
+- extractor: Fix video extraction for webm
+- server: Fix download original files with whitespace
+
+## [1.19.0] - 2025-01-05
+
+### Added
+
+- webapp: Feature flag for sources to download original files
+
+### Changed
+
+- index: Apply file index journal after successful database update
+
+### Fixed
+
+- server: Fix user on server log
+- storage: Log error on storage purge
+
+## [1.18.0] - 2024-09-24
+
+### Added
+
+- webapp: Add toggle for face and object annotations
+- server: Add option prefix
+- webapp: Support IPTC description
+
+### Changed
+
+- server: Reduce log levels of request logs
+
+### Fixed
+
+- webapp: Fix tag wrap in detail view
+- query: Fix location alias
+- webapp: Fix street/road search link
+- webapp: Fix similarity search
+- server: Fix page reload with base path
+- webapp: Fix browser based router with base path
+
+## [1.17.0] - 2024-09-15
+
+### Added
+
+- webapp: Add dynamic load of plugins
+- cli: Add build version
 - extractor: Add support for avif images
 
 ### Changed
@@ -18,6 +98,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- server: Fix base path with multiple path segements
+- webapp: Fix tag list with different tag cases
+- plugin: Fix plugin module load on windows
+- cli: Fix execution on windows
+- bundle: Fix binary tmp dir with snapshot
 - extractor: Fix image resizer for all existing previews
 
 ## [1.16.1] - 2024-08-10

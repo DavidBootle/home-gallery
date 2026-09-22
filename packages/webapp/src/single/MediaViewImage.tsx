@@ -1,115 +1,173 @@
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ReactPhotoSphereViewer } from "react-photo-sphere-viewer";
 
-import { getLowerPreviewUrl, getHigherPreviewUrl, getHighestPreviewUrl } from '../utils/preview'
+import { getLowerPreviewUrl, getHighestPreviewUrl } from '../utils/preview'
 import { usePreviewSize } from "./usePreviewSize";
 import { useClientRect } from '../utils/useClientRect'
+import { MediaAnnotations } from "./MediaAnnotations";
+import { useAppConfig } from "../config/useAppConfig";
+
+type MediaPreview = {
+  size: number
+  url: string
+}
 
 export const MediaViewImage = (props) => {
-  const imgRef = useRef<HTMLImageElement>();
+  const imgRef = useRef<HTMLImageElement>(null);
+  const appConfig = useAppConfig()
+
+  const { media, prev, next, showAnnotations, zoomFactor = 1 } = props;
+  const { previews } = props.media;
+  const sphericalViewer = media.tags?.includes('Spherical');
+  const previewSize = usePreviewSize()
+  const smallUrl = getLowerPreviewUrl(previews, previewSize / 4) || ''
+  const largeUrl = getHighestPreviewUrl(previews, previewSize)
+
+  const downloadableIndices = useMemo(() => {
+    const indices = appConfig.sources?.filter(s => s.downloadable && s.indexName).map(s => s.indexName) || []
+    return indices as string[]
+  }, [appConfig])
+
   const imgRect = useClientRect(imgRef);
-  const [faceRects, setFaceRects] = useState([]);
-  const [objectRects, setObjectRects] = useState([]);
-  const { showDetails } = props;
-  const { id, shortId, previews, faces, objects, tags } = props.media;
-  const navigate = useNavigate();
-  const previewSize = usePreviewSize();
-  const showSphericalViewer = tags ? tags.includes('Spherical') : false;
-
-  const smallUrl = getLowerPreviewUrl(previews, previewSize / 4);
-  const largeUrl = showSphericalViewer ? getHighestPreviewUrl(previews, previewSize) : getHigherPreviewUrl(previews, previewSize);
-  const [src, setSrc] = useState('');
-
-  useEffect(() => {
-    if (!largeUrl) {
-      return
-    }
-    const img = new Image();
-    img.addEventListener('load', () => {
-      setSrc(largeUrl);
-    });
-    img.src = largeUrl;
-  }, []);
-
-  const selectFace = (shortId, faceNo) => {
-    console.log(`Search for face ${faceNo} of ${shortId}`);
-    navigate(`/faces/${shortId}/${faceNo}`);
-  }
-
-  useEffect(() => {
-    const e = imgRef.current;
-    if (!e || !imgRect || !showDetails) {
-      return;
-    }
-    let { x, y, width, height } = imgRect;
-    const { naturalWidth, naturalHeight } = e
-    const rectRatio = width / height
-    const naturalRatio = naturalWidth / naturalHeight
-
-    if (rectRatio > naturalRatio) {
-      const scale = height / naturalHeight
-      const fixedWidth = scale * naturalWidth
-      x += (width - fixedWidth) / 2
-      width = fixedWidth
-    } else {
-      const scale = width / naturalWidth
-      const fixedHeight = scale * naturalHeight
-      y += (height - fixedHeight) / 2
-      height = fixedHeight
-    }
-
-    setFaceRects(faces.map((face, i) => {
-      const style: React.CSSProperties = {
-        top: `${(y + face.y * height).toFixed()}px`,
-        left: `${(x + face.x * width).toFixed()}px`,
-        width: `${(face.width * width).toFixed()}px`,
-        height: `${(face.height * height).toFixed()}px`,
-      }
-      return (
-        <div key={i} className='absolute flex items-start border border-pink-700 rounded group hover:bg-pink-900/15 hover:cursor-pointer' style={style} onClick={() => selectFace(shortId, i)}>
-          <span className="px-2 text-pink-700 rounded-br group-hover:bg-pink-700 group-hover:text-gray-200">{face.gender} ~{face.age}y</span>
-        </div>
-      );
-    }))
-
-    setObjectRects(objects.map((object, i) => {
-      const style: React.CSSProperties = {
-        top: `${(y + object.y * height).toFixed()}px`,
-        left: `${(x + object.x * width).toFixed()}px`,
-        width: `${(object.width * width).toFixed()}px`,
-        height: `${(object.height * height).toFixed()}px`,
-      }
-      return (
-        <div key={i} className='absolute flex items-start border border-green-700 rounded group hover:bg-green-900/15' style={style}>
-          <span className="px-2 text-green-700 rounded-br group-hover:bg-green-700 group-hover:text-gray-200">{object.class}</span>
-        </div>
-      );
-    }))
-  }, [imgRef, imgRect, src, showDetails]);
+  const src = useZoomableSrc(imgRect, media, downloadableIndices, zoomFactor, smallUrl)
+  usePrevNextLoading(prev, next, imgRect)
 
   return (
     <>
       <div className="relative w-full h-full">
-        { showSphericalViewer &&
+        {sphericalViewer ? (
           <div className="absolute object-contain w-full h-full -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2">
-            <ReactPhotoSphereViewer
-              src={largeUrl}
-              height={"100vh"}
-              width={"100%"}
-            ></ReactPhotoSphereViewer>
+            <ReactPhotoSphereViewer src={largeUrl} height="100vh" width="100%" />
           </div>
-        }
-        { !showSphericalViewer &&
+        ) : (
           <>
             <img ref={imgRef} className="absolute object-contain w-full h-full -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2" src={smallUrl} />
             <img className="absolute object-contain w-full h-full -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2" src={src} />
+            {showAnnotations && <MediaAnnotations media={props.media} imgRef={imgRef} src={src} />}
           </>
-        }
-        {showDetails && objectRects}
-        {showDetails && faceRects}
+        )}
       </div>
     </>
   )
+}
+
+function getMediaPreviews(media, downloadableIndices: string[] = []) {
+  const mediaPreviews: MediaPreview[] = media.previews.reduce((result: MediaPreview[], url: string) => {
+    const match = url.match(/image-preview-(\d+)\./)
+    if (!match) {
+      return result
+    }
+    const size = +match[1]
+    const hasSize = !!result.find(preview => preview.size == size)
+    if (!hasSize) {
+      result.push({size: +match[1], url: `files/${url}`})
+    }
+    return result
+  }, [] as MediaPreview[])
+
+  if (downloadableIndices.length) {
+    const file = media.files.find(file => file.type == 'image' && downloadableIndices.includes(file.index))
+    if (file) {
+      const size = Math.max(media.height, media.width)
+      mediaPreviews.push({size, url: `api/sources/${file.index}/${file.filename}`})
+    }
+  }
+
+  mediaPreviews.sort((a, b) => a.size - b.size)
+  return mediaPreviews
+}
+
+function getRequiredMediaPreview(previews: MediaPreview[], requiredSize: number) {
+  if (previews.length == 0) {
+    return null
+  }
+  const preview = previews.find(p => p.size >= requiredSize)
+  if (preview) {
+    return preview
+  }
+
+  return previews[previews.length - 1]
+}
+
+function getRequiredSize(rect: {width: number, height: number}, media: {width: number, height: number}, zoomFactor: number = 1) {
+  const rectRatio = rect.width / rect.height
+  const mediaRatio = media.width / media.height
+
+  let rectScale: number // scale factor for image to fit into rect
+  if (rectRatio > mediaRatio) {
+    rectScale = rect.height / media.height
+  } else {
+    rectScale = rect.width / media.width
+  }
+
+  const scale = rectScale * zoomFactor * (window.devicePixelRatio || 1)
+  let requiredSize: number
+  if (mediaRatio > 1) { // landscape
+    requiredSize = media.width * scale
+  } else { // portrait
+    requiredSize = media.height * scale
+  }
+
+  return requiredSize
+}
+
+function useZoomableSrc(imgRect: DOMRect | null, media: any, downloadableIndices: string[], zoomFactor, initialSrc: string) {
+  const [src, setSrc] = useState(initialSrc)
+
+  useEffect(() => {
+    if (!imgRect || !media?.width || !media?.height) {
+      return
+    }
+
+    const requiredSize = getRequiredSize(imgRect, media, zoomFactor)
+    const previews = getMediaPreviews(media, downloadableIndices)
+    const preview = getRequiredMediaPreview(previews, requiredSize)
+    if (!preview || preview.url == src) {
+      return
+    }
+
+    function handleLoad() {
+      if (!preview) {
+        return
+      }
+      setSrc(preview.url)
+    }
+
+    const img = new Image()
+    img.addEventListener('load', handleLoad)
+    img.src = preview.url
+
+    return () => {
+      img.removeEventListener('load', handleLoad)
+    }
+  }, [imgRect, media, zoomFactor]);
+
+  return src
+}
+
+function usePrevNextLoading(prev, next, imgRect) {
+  useEffect(() => {
+    if (!imgRect) {
+      return
+    }
+
+    function loadPreview(media) {
+      if (!media) {
+        return
+      }
+
+      const requiredSize = getRequiredSize(imgRect, media)
+      const previews = getMediaPreviews(media)
+      const preview = getRequiredMediaPreview(previews, requiredSize)
+
+      if (preview) {
+        const img = new Image()
+        img.src = preview.url
+      }
+    }
+
+    loadPreview(prev)
+    loadPreview(next)
+  }, [prev, next, imgRect])
 }

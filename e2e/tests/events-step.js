@@ -1,17 +1,9 @@
 const fs = require('fs').promises
 const path = require('path')
+const http = require('http')
 const assert = require('assert')
-const fetch = require('node-fetch')
 
 const { getEventsFilename } = require('../utils');
-
-step('Fetching events has status <status>', async (status) => {
-  const serverUrl = gauge.dataStore.scenarioStore.get('serverUrl')
-  return fetch(`${serverUrl}/api/events`)
-    .then(res => {
-      assert(res.status == status, `Expected status code ${status} but was ${res.status}`)
-    })
-})
 
 const createUUID = () => {
   return 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'.replace(/x/g, () => {
@@ -34,14 +26,22 @@ step('Post tag event with <tag> for media <id>', async (tag, id) => {
   const event = createUserAction(tag, id)
 
   const serverUrl = gauge.dataStore.scenarioStore.get('serverUrl')
-  await fetch(`${serverUrl}/api/events`, {
-    method: 'POST',
-    mode: 'cors',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(event)
+  return new Promise((resolve, reject) => {
+    const req = http.request(`${serverUrl}/api/events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 300
+    }, res => {
+      const ok = res.statusCode >= 200 && res.statusCode < 300
+      res.resume()
+      res.on('end', () => ok ? resolve() : reject(new Error(`Failed to post event with status ${res.statusCode}`)))
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.write(JSON.stringify(event))
+    req.end()
   })
 })
 

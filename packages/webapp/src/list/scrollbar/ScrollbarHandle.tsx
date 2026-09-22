@@ -1,9 +1,9 @@
 import * as React from "react"
-import { useState, useRef, useEffect, Dispatch } from "react"
+import { useState, useRef, useEffect, type Dispatch } from "react"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import * as icons from '@fortawesome/free-solid-svg-icons'
 
-import { ScrollbarActions } from "./state"
+import { type ScrollbarActions } from "./state"
 import { useClientHeight } from "./useClientHeight"
 
 import { useMouseDragging, useTouchDragging} from './useDragging'
@@ -11,9 +11,9 @@ import { classNames } from "../../utils/class-names"
 import { useClick } from "./useClick"
 
 const Icon = ({icon, onClick}) => {
-  const ref = useRef(null)
+  const ref = useRef<HTMLElement>(null)
 
-  let start
+  let start: number
   const handleDown = () => {
     start = Date.now()
   }
@@ -58,10 +58,10 @@ export interface ScrollbarHandleProps {
 }
 
 export const ScrollbarHandle = ({dispatch, top, visible, detailText, showDetail}: ScrollbarHandleProps) => {
-  const handleRef = useRef()
-  const thumbRef = useRef()
-  const upButton = useRef()
-  const downButton = useRef()
+  const handleRef = useRef<HTMLElement>(null)
+  const thumbRef = useRef<HTMLElement>(null)
+  const upButton = useRef<HTMLElement>(null)
+  const downButton = useRef<HTMLElement>(null)
 
   const mouseDrag = useMouseDragging(handleRef)
   const touchDrag = useTouchDragging(handleRef)
@@ -84,7 +84,7 @@ export const ScrollbarHandle = ({dispatch, top, visible, detailText, showDetail}
   return (
     <>
       <div className={classNames('absolute right-0 mr-1 flex gap-2 items-center justify-center hover:cursor-pointer', {hidden: !visible})} ref={handleRef} style={{top: top}}>
-        {detailText && showDetail && <div className={classNames('bg-gray-800/90 px-4 py-2 rounded text-gray-300')}>{detailText}</div>}
+        {detailText && showDetail && <div className={classNames('bg-gray-800/90 px-4 py-2 rounded text-gray-300 text-nowrap')}>{detailText}</div>}
         <div className="flex flex-col gap-1 bg-gray-800 rounded" ref={thumbRef} >
           <span ref={upButton} className="px-2 py-1 group hover:bg-gray-700 hover:text-gray-300">
             <FontAwesomeIcon icon={icons.faChevronUp} className="text-gray-500 group-hover:text-gray-300"/>

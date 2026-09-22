@@ -7,7 +7,9 @@ import {
 } from "react-router-dom";
 import Hammer from 'hammerjs';
 import { useHotkeys } from 'react-hotkeys-hook';
+import Logger from '@home-gallery/logger'
 
+import { useAppConfig } from "../config/useAppConfig";
 import { useEntryStore } from "../store/entry-store";
 import { useSearchStore } from "../store/search-store";
 import { useSingleViewStore } from "../store/single-view-store";
@@ -22,6 +24,10 @@ import { Zoomable } from "./Zoomable";
 import useBodyDimensions from "../utils/useBodyDimensions";
 import { classNames } from '../utils/class-names'
 import { SingleTagDialogProvider } from "../dialog/tag-dialog-provider";
+import { useMediaViewHotkeys } from "./useMediaViewHotkeys";
+import { MediaViewDisableFlags } from "./MediaViewPage";
+
+const log = Logger('MediaView')
 
 const findEntryIndex = (location, entries, id) => {
   if (location.state?.index && entries[location.state.index]?.id.startsWith(id)) {
@@ -50,24 +56,9 @@ const scaleDimensions = (media, device) => {
 
 const encodeUrl = (url: string) => url.replace(/[\/]/g, char => encodeURIComponent(char))
 
-const hotkeysToAction = {
-  'home': 'first',
-  'left,j,backspace': 'prev',
-  'ctrl+left': 'prev-10',
-  'ctrl+shift+left': 'prev-100',
-  'right,k,space': 'next',
-  'ctrl+right': 'next-10',
-  'ctrl+shift+right': 'next-100',
-  'end': 'last',
-  'esc': 'list',
-  'i': 'toggleDetails',
-  's': 'similar',
-  'c': 'chronology',
-  't': 'toggleNavigation',
-  'm': 'map'
-}
-
 export const MediaView = () => {
+  const appConfig = useAppConfig();
+  const disableFlags = appConfig.pages?.mediaView?.disabled || [] as MediaViewDisableFlags
   let { id } = useParams();
   let location = useLocation();
   const navigate = useNavigate();
@@ -77,30 +68,31 @@ export const MediaView = () => {
   const entries = useEntryStore(state => state.entries);
   const lastIndex = useSingleViewStore(state => state.lastIndex);
   const showDetails = useSingleViewStore(state => state.showDetails);
+  const showAnnotations = useSingleViewStore(state => state.showAnnotations);
   const showNavigation = useSingleViewStore(state => state.showNavigation);
   const setLastId = useSingleViewStore(state => state.setLastId);
   const setLastIndex = useSingleViewStore(state => state.setLastIndex);
   const search = useSearchStore(state => state.search);
   const setShowDetails = useSingleViewStore(actions => actions.setShowDetails);
+  const setShowAnnotations = useSingleViewStore(actions => actions.setShowAnnotations);
   const setShowNavigation = useSingleViewStore(actions => actions.setShowNavigation);
 
   const [hideNavigation, setHideNavigation] = useState(false)
+  const [zoomFactor, setZoomFactor] = useState(1)
+
+  const [hotkeys, hotkeyToAction] = useMediaViewHotkeys();
 
   let index = findEntryIndex(location, entries, id);
 
   const current = entries[index];
   const prev = entries[index - 1];
   const next = entries[index + 1];
-  
-  console.log('current image', current);
 
   const isImage = current && (current.type === 'image' || current.type === 'rawImage');
   const isVideo = current && (current.type === 'video')
   const isUnknown = !current || (['image', 'rawImage', 'video'].indexOf(current.type) < 0)
 
   const key = current ? current.id : (Math.random() * 100000).toFixed(0);
-  const scaleSize = scaleDimensions(current, dimensions);
-  console.log(scaleSize, dimensions, current);
 
   useEffect(() => { id && setLastId(id) }, [id])
   useEffect(() => { index >= 0 && setLastIndex(index) }, [index])
@@ -121,10 +113,12 @@ export const MediaView = () => {
       const negate = prevNextMatch[1] == 'prev' ? -1 : 1
       const i = Math.min(entries.length - 1, Math.max(0, index + (negate * offset)))
       viewEntry(i)
-    } else if (type === 'similar' && current?.similarityHash) {
+    } else if (type === 'similar' && current?.similarityHash && !disableFlags.includes('annotation')) {
       navigate(`/similar/${current.shortId}`);
-    } else if (type === 'toggleDetails') {
+    } else if (type === 'toggleDetails' && !disableFlags.includes('detail')) {
       setShowDetails(!showDetails);
+    } else if (type === 'toggleAnnotations' && !disableFlags.includes('annotation')) {
+      setShowAnnotations(!showAnnotations);
     } else if (type === 'toggleNavigation') {
       setShowNavigation(!showNavigation);
     } else if (type == 'first' && entries.length) {
@@ -142,7 +136,7 @@ export const MediaView = () => {
       setHideNavigation(false);
     } else if (type == 'search') {
       navigate(`/search/${encodeUrl(action.query)}`);
-    } else if (type == 'map') {
+    } else if (type == 'map' && current?.latitude && current?.longitude && !disableFlags.includes('map')) {
       navigate(`/map?lat=${current.latitude.toFixed(5)}&lng=${current.longitude.toFixed(5)}&zoom=14`, {state: {listLocation}})
     }
   }
@@ -152,23 +146,23 @@ export const MediaView = () => {
       dispatch({type: 'next'})
     } else if (ev.direction === Hammer.DIRECTION_RIGHT) {
       dispatch({type: 'prev'})
+    } else if (ev.direction === Hammer.DIRECTION_DOWN || ev.direction === Hammer.DIRECTION_UP) {
+      dispatch({type: 'list'})
     }
   }
 
-  useHotkeys(Object.keys(hotkeysToAction).join(','), (ev, handler) => {
-    const found = Object.keys(hotkeysToAction).find(hotkey => {
-      const keys = hotkey.split(',')
-      const found = keys.find(key => handler.key == key)
-      if (found) {
-        console.log(`Catch hotkey ${found} for ${hotkeysToAction[hotkey]}`)
-        dispatch({type: hotkeysToAction[hotkey]})
-        return true
-      }
-    })
-    if (found) {
-      ev.preventDefault()
+  useHotkeys(hotkeys, (ev, handler) => {
+    const handlerKey = (handler.ctrl ? 'ctrl+' : '') + (handler.shift ? 'shift+' : '') + (handler.alt ? 'alt+' : '') + (handler.keys || []).join('+')
+    const action = hotkeyToAction[handlerKey]
+
+    if (!action) {
+      log.warn(`Hotkey action of ${handlerKey} not found`)
+      return
     }
-  }, [index, showDetails, showNavigation])
+
+    dispatch({type: action})
+    ev.preventDefault()
+  }, [index, showDetails, showAnnotations, showNavigation])
 
   const mediaVanishes = index < 0 && lastIndex >= 0 && entries.length > 0
   if (mediaVanishes) {
@@ -179,9 +173,8 @@ export const MediaView = () => {
     dispatch({type: 'list'})
   }
 
-  console.log('Media object', current, showDetails);
-
-  const sphericalViewer = isImage ? current.tags && current.tags.includes('Spherical') : false;
+  console.log('Media object', current);
+  const sphericalViewer = isImage && current.tags?.includes('Spherical');
 
   return (
     <>
@@ -189,16 +182,16 @@ export const MediaView = () => {
         <div className="flex flex-col w-screen md:flex-row h-dvh">
           <div className={classNames('w-full', {'h-1/2 flex-shrink-0 md:flex-shrink md:h-full': showDetails, 'h-full': !showDetails})}>
             <div className="relative w-full h-full overflow-hidden">
-              {!hideNavigation &&
+              {!hideNavigation && showNavigation &&
                 <MediaNav index={index} current={current} prev={prev} next={next} listLocation={listLocation} showNavigation={showNavigation} dispatch={dispatch} />
               }
               {isImage && !sphericalViewer &&
-                <Zoomable key={key} childWidth={current.width} childHeight={current.height} onSwipe={onSwipe}>
-                  <MediaViewImage key={key} media={current} next={next} prev={prev} showDetails={showDetails}/>
+                <Zoomable key={key} childWidth={current.width} childHeight={current.height} onSwipe={onSwipe} onZoom={setZoomFactor}>
+                  <MediaViewImage key={key} media={current} next={next} prev={prev} showAnnotations={showAnnotations} zoomFactor={zoomFactor}/>
                 </Zoomable>
               }
               {isImage && sphericalViewer &&
-                <MediaViewImage key={key} media={current} next={next} prev={prev} showDetails={showDetails}/>
+                <MediaViewImage key={key} media={current} next={next} prev={prev} />
               }
               {isVideo &&
                 <MediaViewVideo key={key} media={current} next={next} prev={prev} dispatch={dispatch}/>
@@ -209,7 +202,7 @@ export const MediaView = () => {
             </div>
           </div>
           { showDetails &&
-            <div className="md:flex-shrink-0 md:w-90">
+            <div className="md:w-90">
               <Details entry={current} dispatch={dispatch} />
             </div>
           }
@@ -218,4 +211,3 @@ export const MediaView = () => {
     </>
   )
 }
-

@@ -3,7 +3,7 @@ import { pipeline } from 'stream/promises'
 
 import Logger from '@home-gallery/logger'
 import { toList, write } from '@home-gallery/stream'
-import { TExtractorStream, TExtractorFunction, TExtractor, TPlugin, TDatabaseMapperStream, TDabaseMapperFunction, TDatabaseMapper, TExtractorEntry, TStorageEntry, TQueryPlugin, TQueryAst, TQueryContext, TAst, TPluginManager } from '@home-gallery/types'
+import { TExtractorStream, TExtractorFunction, TExtractor, TPlugin, TDatabaseMapperStream, TDabaseMapperFunction, TDatabaseMapper, TExtractorEntry, TStorageEntry, TQueryPlugin, TQueryAst, TQueryContext, TAst, TPluginManager, TPluginEnvironment, TDatabaseEntry } from '@home-gallery/types'
 
 Logger.addPretty('trace')
 const log = Logger('testUtils')
@@ -16,20 +16,18 @@ export async function testEntryStream(streams: TExtractorStream[]) {
     {sha1sum: '2', type: 'video', files: [], meta: {}}
   ]
 
-  const transforms: Transform[] = streams.map(s => s.stream)
-  const pipelineStreams = [
+  await pipeline(
     Readable.from(entries),
     ...streams.map(s => s.stream),
     toList(),
     write((result: TExtractorEntry[]) => data = result)
-  ]
-  await pipeline(pipelineStreams)
+  )
 
   return data
 }
 
 export async function testDatabaseMapperStream(stream: TDatabaseMapperStream) {
-  let data
+  let data: TDatabaseEntry[] = []
 
   const entries: Partial<TStorageEntry>[] = [
     {sha1sum: '1', type: 'image', files: [], meta: {}}, 
@@ -80,6 +78,7 @@ export type TTestPluginOption = {
   extractor?: TExtractor,
   mapper?: TDatabaseMapper
   query?: TQueryPlugin
+  environments?: TPluginEnvironment[]
 }
 
 export const createExtractorPlugin = (name: string, fn: TExtractorFunction) => {
@@ -95,6 +94,7 @@ export const createPlugin = (name: string, option: TTestPluginOption) => {
   const plugin: TPlugin = {
     name: `${name}Plugin`,
     version: '1.0',
+    environments: option.environments,
     async initialize(manager: TPluginManager) {
       log.debug(`Initialize plugin ${this.name}`)
       if (option.extractor) {

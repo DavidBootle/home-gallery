@@ -8,9 +8,9 @@
     "dist"
   ],
   "scripts": {
-    "clean": "rimraf dist",
-    "build": "cpy \"src/**\" dist",
-    "watch": "onchange \"src/**\" -- npm run build"
+    "clean": "rimraf dist *.tsbuildinfo",
+    "build": "dev-cli build",
+    "watch": "dev-cli build --watch"
   },
   "keywords": [
     "HomeGallery",

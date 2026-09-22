@@ -5,9 +5,8 @@ const { Buffer } = require('buffer')
 const fs = require('fs').promises
 const http = require('http')
 const https = require('https')
-const url = require('url')
+const URL = require('url').URL
 const assert = require('assert')
-const fetch = require('node-fetch')
 const express = require('express')
 
 const { generateId, nextPort, waitFor, runCliAsync, killChildProcess, getBaseDir, getPath, getStorageDir, getDatabaseFilename, getEventsFilename, readDatabase, addCliEnv, resolveProperty, parseValue, assertDeep, log } = require('../utils')
@@ -15,29 +14,94 @@ const { generateId, nextPort, waitFor, runCliAsync, killChildProcess, getBaseDir
 const serverTestHost = '127.0.0.1'
 const servers = {}
 
-const insecureOption = {
-  agent: new https.Agent({
-    rejectUnauthorized: false,
+const insecureAgent = new https.Agent({
+  rejectUnauthorized: false,
+})
+
+const request = (path, options = {}) => {
+  return new Promise((resolve, reject) => {
+    const serverUrl = gauge.dataStore.scenarioStore.get('serverUrl')
+    if (!serverUrl) {
+      return reject(new Error(`Expected serverUrl but was empty. Start server first`))
+    }
+
+    const prefix = gauge.dataStore.scenarioStore.get('prefix') || ''
+    const headers = gauge.dataStore.scenarioStore.get('request.headers') || {}
+    const agent = serverUrl.startsWith('https') ? insecureAgent : undefined
+
+    const requestUrl = `${serverUrl}${prefix}${path || ''}`
+    const url = new URL(serverUrl)
+    const requestOptions = {
+      method: options.method || 'GET',
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port,
+      path: `${prefix}${path || ''}`, // allow invalid test path like /api/../../etc/passwd
+      headers: Object.assign({}, options.headers || {}, headers),
+      timeout: options.timeout || 300,
+      agent
+    }
+
+    const req = http.request(requestOptions, res => {
+      res._originUrl = requestUrl
+      res._originHeaders = requestOptions.headers
+      resolve(res)
+    })
+    req.on('error', reject)
+    if (options.body) {
+      req.write(options.body)
+    }
+    req.end()
   })
 }
 
-const fetchFacade = (path, options = {}) => {
-  const url = gauge.dataStore.scenarioStore.get('serverUrl')
-  assert(!!url, `Expected serverUrl but was empty. Start server first`)
-
-  const headers = gauge.dataStore.scenarioStore.get('request.headers') || {}
-  const agent = url.startsWith('https') ? insecureOption : {}
+const bodyResponse = (res) => {
   const t0 = Date.now()
-  const fetchUrl = `${url}${path || ''}`
-  return fetch(fetchUrl, Object.assign(options, {timeout: 500, headers: Object.assign({}, options.headers, headers)}, agent))
-    .then(res => {
+  return new Promise((resolve, reject) => {
+    let body = ''
+
+    res.setEncoding('utf8')
+    res.on('data', chunk => body += chunk)
+    res.on('error', reject)
+    res.on('end', () => {
+      const url = res._originUrl || {}
+      const headers = res._originHeaders
+
       const curlHeaders = Object.entries(headers).map(([key, value]) => `-H "${key}: ${value}"`).join(' ') + ' '
-      const curl = `curl ${url.startsWith('https') ? '-k ' : ''}${curlHeaders}${url}${path || ''}`
+      const curl = `curl ${res.req.protocol == 'https:' ? '-k ' : ''}${curlHeaders}${url}`
       const data = {duration: Date.now() - t0, curl, headers}
-      log.debug(data, `Fetched ${path} with status ${res.status}`)
-      return res
+      log.debug(data, `Fetched ${url} with status ${res.statusCode}`)
+
+      gauge.dataStore.scenarioStore.put('response.status', res.statusCode)
+      resolve([res, body])
     })
+  })
 }
+
+// Implement fetch like facade to have better control over raw test request
+const fetchFacade = (path, options = {}) => request(path, options)
+  .then(bodyResponse)
+  .then(([res, body]) => {
+    const fetchLike = {
+      ok: res.statusCode >= 200 && res.statusCode < 300,
+      status: res.statusCode,
+      headers: {
+        get: name => res.headers[name.toLowerCase()]
+      },
+      json() {
+        try {
+          return Promise.resolve(JSON.parse(body))
+        } catch (e) {
+          return Promise.reject(e)
+        }
+      },
+      text() {
+        return Promise.resolve(body)
+      }
+    }
+
+    return fetchLike
+  })
 
 const fetchDatabase = () => fetchFacade('/api/database.json')
   .then(res => res.ok ? res : Promise.reject(`Response code is not successfull`))
@@ -70,12 +134,12 @@ const startServer = async (args = []) => {
   }
   gauge.dataStore.scenarioStore.put('serverUrl', url)
 
-  return waitFor(() => fetchFacade('/favicon.ico'), 10 * 1000).catch(e => {throw new Error(`Could not start server with args: ${args.join(' ')}. Error ${e}`)})
+  return waitFor(() => fetchFacade('/'), 10 * 1000).catch(e => {throw new Error(`Could not start server with args: ${args.join(' ')}. Error ${e}`)})
 }
 
 step("Start server", startServer)
 
-step("Start only server", () => startServer(['--no-watch-sources']))
+step("Start only server", () => startServer(['--no-import-sources']))
 
 step("Start server with args <args>", async (args) => {
   const argList = args.split(/\s+/)
@@ -168,6 +232,11 @@ step("Start mock server", async () => {
   })
 })
 
+step("Wait for file <file>", async (file) => {
+  const onlyOk = res => res.ok ? res : Promise.reject(`Response code is not successfull`)
+  return waitFor(() => fetchFacade(file).then(onlyOk), 10 * 1000).catch(e => {throw new Error(`Waiting for file ${file} failed. Error ${e}`)})
+})
+
 step("Wait for database", () => waitFor(() => fetchDatabase(), 10 * 1000).catch(e => {throw new Error(`Waiting for database failed. Error ${e}`)}))
 
 step("Wait for current database", async () => {
@@ -193,9 +262,7 @@ const waitForEvent = async (eventPredicate) => {
 }
 
 step("Listen to server events", async () => {
-  const serverUrl = gauge.dataStore.scenarioStore.get('serverUrl')
-
-  const onResponse = res => {
+  const onResponse = (res) => {
     res.setEncoding('utf8')
     res.on('data', (data) => {
       const lines = data.toString().split('\n').filter(line => !!line)
@@ -209,25 +276,7 @@ step("Listen to server events", async () => {
     })
   }
 
-  const headers = gauge.dataStore.scenarioStore.get('request.headers') || {}
-  const agent = serverUrl.startsWith('https') ? insecureOption : undefined
-
-  const parsedUrl = url.parse(`${serverUrl}/api/events/stream`)
-  const options = {
-    method: 'GET',
-    protocol: parsedUrl.protocol,
-    hostname: parsedUrl.hostname,
-    port: parsedUrl.port,
-    path: parsedUrl.path,
-    headers,
-    agent
-  }
-  const req = http.request(options, onResponse)
-
-  req.on('error', err => {
-    gauge.message(`Listen to EventStream failed: ${err}`)
-  })
-  req.end()
+  request('/api/events/stream').then(onResponse)
 
   return waitForEvent(event => event.type == 'pong')
 })
@@ -260,6 +309,7 @@ step("Stop server", async () => {
 step("Request file <file>", async (file) => {
   return fetchFacade(file)
     .then(res => {
+      gauge.dataStore.scenarioStore.put('response.headers', res.headers)
       gauge.dataStore.scenarioStore.put('response.status', res.status)
       if (res.ok && res.headers.get('Content-Type') && res.headers.get('Content-Type').startsWith('application/json')) {
         return res.json().then(body => {
@@ -278,6 +328,12 @@ step("Response status is <status>", async (status) => {
   assert(responseStatus == status, `Expected response status ${status} but was ${responseStatus}`)
 })
 
+step("Response content type is <mime>", async (mime) => {
+  const headers = gauge.dataStore.scenarioStore.get('response.headers')
+  const contentType = headers && headers.get('Content-Type')
+  assert(contentType == mime, `Expected response content type ${mime} but was ${contentType}`)
+})
+
 step("Response body has property <property> with value <value>", async (property, value) => {
   const body = gauge.dataStore.scenarioStore.get('response.body')
   const resolvedProperty = resolveProperty(body, property)
@@ -289,14 +345,25 @@ step("Response body has property <property> with value <value>", async (property
   }
 })
 
-step("Response has app state with <amount> entries", async (amount) => {
+const getAppState = () => {
   const body = gauge.dataStore.scenarioStore.get('response.body') || ''
   const script = body.split('\n').filter(line => line.match(/__homeGallery/)).filter(line => line.match(/script/)).pop() || ''
   const json = script.replace(/<\/script>.*/, '').replace(/.*homeGallery=/, '') || '{}'
-  const state = JSON.parse(json)
+  return JSON.parse(json)
+}
+
+step("Response has app state with <amount> entries", async (amount) => {
+  const state = getAppState()
 
   const entryLength = state.entries ? state.entries.length : 0
   assert(entryLength == amount, `Expecting ${amount} entries in app state but found ${entryLength}`)
+})
+
+step("Response has app state has plugin entry <plugin>", async (pluginEntry) => {
+  const state = getAppState()
+
+  const plugins = (state.pluginManager ? state.pluginManager : {}).plugins || []
+  assert(plugins.includes(pluginEntry), `Expecting ${pluginEntry} but have only ${plugins.join(', ')}`)
 })
 
 const btoa = text => Buffer.from(text).toString('base64')
