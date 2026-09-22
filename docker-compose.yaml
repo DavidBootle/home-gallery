@@ -23,7 +23,7 @@ services:
       #- GALLERY_USE_NATIVE=ffprobe,ffmpeg,vipsthumbnail # On issues with sharp resizer
       - GALLERY_OPEN_BROWSER=false
       # Use polling for safety of possible network mounts. Try 0 to use inotify via fs.watch
-      - GALLERY_WATCH_POLL_INTERVAL=300
+      - GALLERY_WATCH_POLL_INTERVAL=0
     volumes:
       - ./data:/data
       # Mount your media directories below /data
