@@ -1,6 +1,7 @@
 import * as icons from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import * as React from "react";
+import { useEffect, useState } from "react";
 
 import { addTags } from '../api/ApiService';
 import { type Tag } from "../api/models";
@@ -13,6 +14,7 @@ import { MediaViewDisableFlags } from "./MediaViewPage";
 import { FeatureFlags } from '../config/AppConfig';
 
 export const Details = ({entry, dispatch}: {entry: Entry, dispatch: any}) => {
+  const [showCopiedToast, setShowCopiedToast] = useState(false)
   const appConfig = useAppConfig()
   const disabledFeatures = appConfig.disabled || [] as FeatureFlags
   const disabledFlags = appConfig.pages?.mediaView?.disabled || [] as MediaViewDisableFlags
@@ -132,9 +134,23 @@ export const Details = ({entry, dispatch}: {entry: Entry, dispatch: any}) => {
     openDialog({initialTags: origTags, onSubmit})
   }
 
-  function copyShareUrlToClipboard(e) {
+  useEffect(() => {
+    if (!showCopiedToast) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => setShowCopiedToast(false), 2000)
+    return () => window.clearTimeout(timeout)
+  }, [showCopiedToast])
+
+  async function copyShareUrlToClipboard(e) {
     e.preventDefault();
-    navigator.clipboard.writeText(getShareUrl());
+    try {
+      await navigator.clipboard.writeText(getShareUrl());
+      setShowCopiedToast(true)
+    } catch (error) {
+      console.error('Unable to copy share link to clipboard', error)
+    }
   }
 
   function getShareUrl() {
@@ -144,6 +160,11 @@ export const Details = ({entry, dispatch}: {entry: Entry, dispatch: any}) => {
 
   return (
     <>
+      {showCopiedToast && (
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded bg-gray-800 px-4 py-2 text-gray-200 shadow-lg" role="status" aria-live="polite">
+          Share link copied
+        </div>
+      )}
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl text-gray-300">Media Details</h3>
