@@ -61,6 +61,7 @@ export const MediaView = () => {
   const disableFlags = appConfig.pages?.mediaView?.disabled || [] as MediaViewDisableFlags
   let { id } = useParams();
   let location = useLocation();
+  const isShareView = location.pathname.split('/').filter(Boolean).includes('share');
   const navigate = useNavigate();
   const listLocation = useListLocation();
   const dimensions = useBodyDimensions();
@@ -113,7 +114,7 @@ export const MediaView = () => {
     if (type === 'index') {
       const i = Math.min(mediaEntries.length - 1, Math.max(0, action.index))
       viewEntry(i)
-    } else if (prevNextMatch && mediaEntries.length) {
+    } else if (prevNextMatch && mediaEntries.length && !isShareView) {
       const offset = prevNextMatch[3] ? +prevNextMatch[3] : 1
       const negate = prevNextMatch[1] == 'prev' ? -1 : 1
       const i = Math.min(mediaEntries.length - 1, Math.max(0, index + (negate * offset)))
@@ -126,13 +127,13 @@ export const MediaView = () => {
       setShowAnnotations(!showAnnotations);
     } else if (type === 'toggleNavigation') {
       setShowNavigation(!showNavigation);
-    } else if (type == 'first' && mediaEntries.length) {
+    } else if (type == 'first' && mediaEntries.length && !isShareView) {
       viewEntry(0)
-    } else if (type == 'last' && mediaEntries.length) {
+    } else if (type == 'last' && mediaEntries.length && !isShareView) {
       viewEntry(mediaEntries.length - 1)
-    } else if (type == 'list') {
+    } else if (type == 'list' && !isShareView) {
       navigate(`${listLocation.pathname}${listLocation.search ? encodeUrl(listLocation.search) : ''}`, {state: {id: current?.id}});
-    } else if (type == 'chronology') {
+    } else if (type == 'chronology' && !isShareView) {
       search({type: 'none'});
       navigate('/');
     } else if (type == 'play') {
@@ -187,7 +188,7 @@ export const MediaView = () => {
         <div className="flex flex-col w-screen md:flex-row h-dvh">
           <div className={classNames('w-full', {'h-1/2 flex-shrink-0 md:flex-shrink md:h-full': showDetails, 'h-full': !showDetails})}>
             <div className="relative w-full h-full overflow-hidden">
-              {!hideNavigation && showNavigation &&
+              {!hideNavigation && showNavigation && !isShareView &&
                 <MediaNav index={index} current={current} prev={prev} next={next} listLocation={listLocation} showNavigation={showNavigation} dispatch={dispatch} />
               }
               {isImage && !sphericalViewer &&
