@@ -8,9 +8,9 @@
     "dist"
   ],
   "scripts": {
-    "clean": "rimraf dist",
-    "build": "cpy \"src/**\" dist",
-    "watch": "onchange \"src/**\" -- npm run build"
+    "clean": "rimraf dist *.tsbuildinfo",
+    "build": "dev-cli build",
+    "watch": "dev-cli build --watch"
   },
   "keywords": [
     "HomeGallery",
@@ -31,6 +31,9 @@
     "@home-gallery/logger": "file:../logger",
     "@home-gallery/query": "file:../query",
     "@home-gallery/storage": "file:../storage",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@home-gallery/dev-tools": "file:../dev-tools"
   }
 }

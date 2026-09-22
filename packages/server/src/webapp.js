@@ -1,13 +1,51 @@
-import fs from 'fs/promises';
-import path from 'path';
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 import Logger from '@home-gallery/logger'
 
 const log = Logger('server.webapp')
 
-import { useIf, isIndex } from './utils.js'
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const indexFile = path.join(__dirname, 'public', 'index.html')
 
-const readFileCached = (file, refreshMs = 10 * 1000) => {
+export async function webapp(context) {
+  const { router } = context
+
+  const readHtml = readFileCached(indexFile)
+
+  router.use((req, res) => {
+    readHtml()
+      .then(html => inject(html, req))
+      .then(html => {
+        res.set({
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache',
+        })
+        res.send(html)
+      })
+      .catch(err => {
+        log.error(err, `Could not read index file ${indexFile}: ${err}`)
+        return res.status(404).json({error: `${err}`, message: `Failed to read index.html. Please see server logs for details`});
+      })
+  })
+}
+
+async function inject(html, req) {
+  const { basePath, injectRemoteConsole, state } = req.webapp
+
+  if (basePath && basePath != '/') {
+    html = html.replace('<base href="/">', `<base href="${basePath}">`)
+  }
+  if (injectRemoteConsole) {
+    html = html.replace('</head>', '<script src="/remote-console.js"></script></head>')
+  }
+  html = html.replace('window.__homeGallery={}', `window.__homeGallery=${JSON.stringify(state)}`)
+
+  return html
+}
+
+function readFileCached(file, refreshMs = 10 * 1000) {
   let data = false
   let lastStatCache = false
   let lastStatTime = 0
@@ -29,49 +67,4 @@ const readFileCached = (file, refreshMs = 10 * 1000) => {
     lastStatCache = statCache
     return data
   }
-}
-
-const injectStateMiddleware = (indexFile, getState, {basePath, injectRemoteConsole}) => {
-
-  const readIndex = readFileCached(indexFile)
-
-  const getIndex = async (req) => {
-    const state = await getState(req)
-    let html = await readIndex()
-
-    if (basePath && basePath != '/') {
-      html = html.replace('<base href="/">', `<base href="${basePath}">`)
-    }
-    if (injectRemoteConsole) {
-      html = html.replace('</head>', '<script src="/remote-console.js"></script></head>')
-    }
-    html = html.replace('window.__homeGallery={}', `window.__homeGallery=${JSON.stringify(state)}`)
-
-    return html
-  }
-
-  return (req, res) => {
-    getIndex(req)
-      .then(html => {
-        res.set({
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store, no-cache',
-          'Content-Length': html.length,
-        })
-        res.send(html);
-      })
-      .catch(err => {
-        log.error(err, `Could not read index file ${indexFile}: ${err}`)
-        return res.status(404).json({error: `${err}`, message: `Failed to read index.html. Please see server logs for details`});
-      })
-  }
-}
-
-export const webapp = (webappDir, getState, options) => {
-  const indexFile = path.resolve(webappDir, 'index.html')
-  const injectState = injectStateMiddleware(indexFile, getState, options)
-  return [
-    useIf(injectState, isIndex),
-    (_, res) => res.sendFile(indexFile)
-  ];
 }

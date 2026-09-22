@@ -2,7 +2,7 @@
 const path = require('path')
 const assert = require("assert")
 const fs = require('fs').promises
-const sizeOf = require('image-size')
+const { imageSizeFromFile } = require('image-size/fromFile')
 const exiftool = require('exiftool-vendored').exiftool
 
 const { getStorageDir, getDatabaseFilename, runCli } = require('../utils')
@@ -45,7 +45,7 @@ step("Storage has no entry <name> for <id>", async (name, id) => {
 step("Storage image <name> for <id> has size <size>", async (name, id, size) => {
   const file = await getEntryFile(id, name)
   assert(file != null, `No ${name} entry for ${id}`)
-  const dimensions = sizeOf(path.resolve(getStorageDir(), file))
+  const dimensions = await imageSizeFromFile(path.resolve(getStorageDir(), file))
   const [width, height] = size.split('x')
   assert(width == dimensions.width && height == dimensions.height, `Expected size of ${name} to be ${size} but was ${dimensions.width}x${dimensions.height}`)
 })

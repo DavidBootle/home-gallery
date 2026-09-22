@@ -36,7 +36,7 @@ export const isWhitelistIp = (rules, ip) => {
       return rule.type == 'allow'
     }
   }
-  return true
+  return false
 }
 
 export const rules2WhitelistRules = rules => {

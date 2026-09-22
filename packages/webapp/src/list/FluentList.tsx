@@ -22,12 +22,13 @@ const Cell = ({height, width, index, item, items}) => {
   const selectedIdMap = useEditModeStore(state => state.selectedIds);
   const toggleId = useEditModeStore(store => store.toggleId);
   const toggleRange = useEditModeStore(store => store.toggleRange);
-  const {id, shortId, previews, vibrantColors, type, duration } = item;
+  const {id, shortId, previews, vibrantColors, type, duration, tags } = item;
   const style = { height, width, backgroundColor: (vibrantColors && vibrantColors[1]) || 'inherited' }
   const navigate = useNavigate();
 
   const widthFactor = getWidthFactor(width, height);
   const previewUrl = getHigherPreviewUrl(previews, width * widthFactor * (window.devicePixelRatio || 1));
+  const isSpherical = (type == 'image' || type == 'rawImage') && tags?.includes('Spherical');
 
   const showImage = () => {
     navigate(`/view/${shortId}`, {state: {listLocation: location, index}});
@@ -82,6 +83,11 @@ const Cell = ({height, width, index, item, items}) => {
   return (
     <div ref={ref} key={id} className={classNames('relative group', {'outline outline-4 outline-primary-300 outline-offset-[-0.25rem] brightness-110 saturate-[1.3]': isSelected()})} style={style}>
       <img className={classNames('object-cover')} style={style} src={previewUrl} loading="lazy" />
+      {isSpherical &&
+        <span className="absolute flex items-center px-2 text-sm text-gray-100 bg-gray-900 rounded bottom-2 right-2 lg:bg-gray-900/60 group-hover:bg-gray-900">
+          360°
+        </span>
+      }
       {type == 'video' &&
         <span className="absolute flex flex-row items-center gap-2 px-2 text-sm text-gray-100 bg-gray-900 rounded bottom-2 right-2 lg:bg-gray-900/60 group-hover:bg-gray-900">
           <FontAwesomeIcon icon={faPlay} size="sm"/>

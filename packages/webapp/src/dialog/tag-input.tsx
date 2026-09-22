@@ -1,11 +1,11 @@
-import React, { FunctionComponent, KeyboardEvent, useRef } from "react";
+import React, { type FunctionComponent, type KeyboardEvent, useRef } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import * as icons from '@fortawesome/free-solid-svg-icons'
 
-import { Tag } from "../api/models";
+import { type Tag } from "../api/models";
 import { classNames } from '../utils/class-names'
 import { toKey } from "../utils/toKey";
-import { TagSuggestion } from "./suggestion";
+import { type TagSuggestion } from "./suggestion";
 import { SuggestionList } from "./suggestion-list";
 
 const TagList = ({tags, withRemove, dispatch}: {tags: Tag[], withRemove: boolean, dispatch}) => {
@@ -42,7 +42,7 @@ export interface TagInputProps {
   dispatch: Function
 }
 
-export const TagInput : FunctionComponent<TagInputProps> = ({value, tags, withRemove: withRemove, suggestions, showSuggestions, dispatch}) => {
+export const TagInput : FunctionComponent<TagInputProps> = ({value, tags, withRemove: withRemove, suggestions, showSuggestions, dispatch, onSubmit, onCancel}) => {
   const ref = useRef<HTMLElement>(null)
 
   const handleKeyDown = (ev: KeyboardEvent<HTMLInputElement>) => {
@@ -58,10 +58,17 @@ export const TagInput : FunctionComponent<TagInputProps> = ({value, tags, withRe
         ev.preventDefault()
         return dispatch({type: 'addTag', value})
       }
+      onSubmit(ev);
     } else if (ev.key == 'Backspace' && value.length == 0) {
       return dispatch({type: 'removeLastTag'})
     } else if (ev.key == 'Escape') {
-      return dispatch({type: 'clearSuggentions'})
+      value = value.replace(/(^\s+|\s+$)/g, '')
+      if (value.length) {
+        return dispatch({type: 'clearSuggentions'})
+      }
+      else {
+        onCancel();
+      }
     } else if (ev.key == 'ArrowDown') {
       ev.preventDefault()
       return dispatch({type: 'nextSuggestion'})

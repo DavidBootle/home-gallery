@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createRoot } from 'react-dom/client';
-import { Root } from "./Main";
+import { Main } from "./Main";
+import "./App.css";
 
 const setVerticalHeight = () => {
   // We execute the same script as before
@@ -12,4 +13,4 @@ document.addEventListener('DOMContentLoaded', setVerticalHeight);
 
 const container = document.getElementById("app");
 const root = createRoot(container!);
-root.render(React.createElement(Root));
+root.render(React.createElement(Main));

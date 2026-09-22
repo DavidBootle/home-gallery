@@ -13,4 +13,7 @@ package-lock.json
 package-lock.json.cache
 gallery.config.yml
 latest-e2e
-.env
+*.tsbuildinfo
+brun.sh
+*.tsbuildinfo
+brun.sh

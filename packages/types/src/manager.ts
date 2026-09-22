@@ -1,8 +1,23 @@
-import { TPluginManager, TPlugin, TPluginExtension } from './plugin'
+import { TPluginManager, TPlugin, TPluginExtension } from './plugin.js'
 
 export type TGalleryPluginManager = TPluginManager & {
-  addPlugin(plugin: TPlugin)
+  addPlugin(plugin: TPlugin): Promise<void>
   loadPlugins(): Promise<void>
   getPlugins(): TPlugin[]
   getExtensions(): TPluginExtension[]
+}
+
+export type TBrowserPluginResource = {
+  plugin: TPlugin
+  localDir: string
+  publicPath: string
+  publicEntry: string
+}
+
+export type TBrowserPluginContext = {
+  plugins: TBrowserPluginResource[]
+}
+
+export type TServerPluginManager = TGalleryPluginManager & {
+  getBrowserPlugins(): TBrowserPluginContext
 }

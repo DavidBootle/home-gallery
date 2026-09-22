@@ -74,10 +74,14 @@ const command = {
         alias: 'C',
         describe: 'SSL certificate file'
       },
+      'prefix': {
+        type: 'string',
+        describe: 'Server prefix for all routes and for browser app. E.g. "/gallery"'
+      },
       'base-path': {
         alias: 'b',
         type: 'string',
-        describe: 'Base path of static page. e.g. "/gallery"'
+        describe: 'Base path of browser app only. E.g. "/gallery". See also prefix option'
       },
       user: {
         alias: 'U',
@@ -89,6 +93,10 @@ const command = {
         array: true,
         describe: 'IP whitelist rule in format type:network. E.g. allow:192.168.0/24 or deny:all. First matching rule wins.'
       },
+      'trust-proxy': {
+        string: true,
+        describe: 'Trust proxy setting. Use loopback, linklocal, uniquelocal or provide ip address'
+      },
       'open-browser': {
         boolean: true,
         describe: 'Open browser on server start'
@@ -96,6 +104,11 @@ const command = {
       'remote-console-token': {
         string: true,
         describe: 'Enable remote console with given debug auth token'
+      },
+      'import-sources': {
+        boolean: true,
+        default: true,
+        describe: 'Import source files on start'
       },
       'watch-sources': {
         boolean: true,
@@ -109,8 +122,6 @@ const command = {
     .default('open-browser', undefined, 'true')
   },
   handler: (argv) => {
-    const ensureLeadingSlash = url => url.startsWith('/') ? url : '/' + url
-
     const argvMapping = {
       host: 'server.host',
       port: 'server.port',
@@ -119,11 +130,14 @@ const command = {
       events: 'events.file',
       key: 'server.key',
       cert: 'server.cert',
-      basePath: {path: 'server.basePath', map: (basePath) => ensureLeadingSlash(basePath)},
+      prefix: 'server.prefix',
+      basePath: 'server.basePath',
       openBrowser: 'server.openBrowser',
       remoteConsoleToken: 'server.removeConsoleToken',
       user: {path: 'server.auth.users', type: 'add', map: mapUsers},
       ipWhitelistRule: {path: 'server.auth.rules', map: mapRules},
+      trustProxy: {path: 'server.trustProxy'},
+      importSources: {path: 'server.importSources'},
       watchSources: {path: 'server.watchSources'}
     }
 

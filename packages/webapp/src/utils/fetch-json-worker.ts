@@ -1,8 +1,7 @@
 import { toWorker } from './to-worker'
+import { toAbsoluteUrl } from './toAbsoluteUrl'
 
-const toAbsoluteUrl = (url: string) : string => (new URL(url, document?.baseURI || '/')).href
-
-const fetchWorker = toWorker((url, init) => {
+const fetchWorker = toWorker('fetch', (url, init) => {
   return fetch(url, init || {})
     .then(res => {
       if (res.status < 200 || res.status >= 300) {

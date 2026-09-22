@@ -8,11 +8,11 @@
     "dist"
   ],
   "scripts": {
-    "clean": "rimraf dist",
-    "build": "cpy \"src/**/!(*.test.js)\" dist",
+    "clean": "rimraf dist *.tsbuildinfo",
+    "build": "dev-cli build",
     "postbuild": "cpy \"../webapp/dist/**\" dist/public",
     "test": "tap ",
-    "watch": "onchange \"src/**\" -- npm run build",
+    "watch": "dev-cli build --watch",
     "watch:test": "tap repl w"
   },
   "keywords": [
@@ -34,9 +34,13 @@
     "@home-gallery/logger": "file:../logger",
     "@home-gallery/query": "file:../query",
     "@home-gallery/storage": "file:../storage",
+    "@home-gallery/webapp": "file:../webapp",
     "archiver": "^5.0.0",
     "async": "^3.2.0",
-    "glob": "^7.1.6",
+    "glob": "^11.0.0",
     "rimraf": "^3.0.2"
+  },
+  "devDependencies": {
+    "@home-gallery/dev-tools": "file:../dev-tools"
   }
 }

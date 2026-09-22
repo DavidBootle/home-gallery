@@ -1,28 +1,36 @@
+import * as icons from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import * as React from "react";
-import { useState } from "react";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import * as icons from '@fortawesome/free-solid-svg-icons'
+import { useEffect, useState } from "react";
 
-import { humanizeDuration, humanizeBytes, formatDate } from "../utils/format";
-import { useTagDialog } from "../dialog/use-tag-dialog";
 import { addTags } from '../api/ApiService';
-import { Tag } from "../api/models";
-import { useAppConfig } from "../utils/useAppConfig";
+import { type Tag } from "../api/models";
+import { useAppConfig } from "../config/useAppConfig";
+import { useTagDialog } from "../dialog/use-tag-dialog";
+import type { Entry } from "../store/entry";
 import { classNames } from "../utils/class-names";
+import { formatDate, humanizeBytes, humanizeDuration } from "../utils/format";
+import { MediaViewDisableFlags } from "./MediaViewPage";
+import { FeatureFlags } from '../config/AppConfig';
 
-export const Details = ({entry, dispatch}) => {
+export const Details = ({entry, dispatch}: {entry: Entry, dispatch: any}) => {
+  const [showCopiedToast, setShowCopiedToast] = useState(false)
   const appConfig = useAppConfig()
+  const disabledFeatures = appConfig.disabled || [] as FeatureFlags
+  const disabledFlags = appConfig.pages?.mediaView?.disabled || [] as MediaViewDisableFlags
+  const dateFormat = appConfig.format?.date || '%d.%m.%y'
+  const timeFormat = appConfig.format?.time || '%H:%M:%S'
   const {openDialog, setDialogVisible} = useTagDialog()
 
   if (!entry) {
     return (<></>)
   }
 
-  const dispatchSearch = (query) => {
+  const dispatchSearch = (query: string) => {
     dispatch({type: 'search', query})
   }
 
-  const escapeSearchValue = value => /[\s+]/.test(value) ? `"${value}"` : value
+  const escapeSearchValue = (value: string) => /[\s+]/.test(value) ? `"${value}"` : value
 
   const queryTerm = (key, value, op?) => {
     let query
@@ -55,6 +63,7 @@ export const Details = ({entry, dispatch}) => {
 
   const mapFile = file => {
     const indexTerm = queryTerm('index', file.index)
+    const isDownloadable = !!appConfig.sources?.find((source) => source.downloadable && source.indexName === file.index);
 
     const filename = file.filename
     const links: React.JSX.Element[] = []
@@ -74,11 +83,17 @@ export const Details = ({entry, dispatch}) => {
       simpleSearchLink(file.index, `index:${file.index}`),
       sepSpan(':'),
       ...links,
-      ` ${humanizeBytes(file.size)}`
+      ` ${humanizeBytes(file.size)}`,
+      isDownloadable && (
+        <a href={`api/sources/${file.index}/${file.filename.replaceAll(/\\/g, '/')}`} target="_blank" className="px-1 text-gray-300 break-all rounded hover:cursor-pointer hover:bg-gray-600 hover:text-gray-200" title={`Click to download original file ${file.filename}`}>
+          download <FontAwesomeIcon icon={icons.faArrowUpRightFromSquare} className="pl-1 text-gray-400 hover:text-gray-200"/>
+        </a>
+      ),
     ]
   }
 
-  const mainFilename = entry.files[0].filename.replace(/.*[/\\]/g, '')
+  const mainFileData = entry.files[0];
+  const mainFilename = mainFileData.filename.replace(/.*[/\\]/g, '')
 
   const hasAddress = entry => entry.road || entry.city || entry.country
 
@@ -119,8 +134,37 @@ export const Details = ({entry, dispatch}) => {
     openDialog({initialTags: origTags, onSubmit})
   }
 
+  useEffect(() => {
+    if (!showCopiedToast) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => setShowCopiedToast(false), 2000)
+    return () => window.clearTimeout(timeout)
+  }, [showCopiedToast])
+
+  async function copyShareUrlToClipboard(e) {
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(getShareUrl());
+      setShowCopiedToast(true)
+    } catch (error) {
+      console.error('Unable to copy share link to clipboard', error)
+    }
+  }
+
+  function getShareUrl() {
+    const url = new URL("../../share/" + entry.shortId, window.location.href);
+    return url.toString();
+  }
+
   return (
     <>
+      {showCopiedToast && (
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded bg-gray-800 px-4 py-2 text-gray-200 shadow-lg" role="status" aria-live="polite">
+          Share link copied
+        </div>
+      )}
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl text-gray-300">Media Details</h3>
@@ -149,14 +193,10 @@ export const Details = ({entry, dispatch}) => {
             </div>
             <div>
               <p>
-                {searchLink(formatDate('%d', entry.date), `year:${entry.date.substr(0, 4)} month:${entry.date.substr(5, 2)} day:${entry.date.substr(8, 2)}`)}
-                <span className="px-1">.</span>
-                {searchLink(formatDate('%m', entry.date), `year:${entry.date.substr(0, 4)} month:${entry.date.substr(5, 2)}`)}
-                <span className="px-1">.</span>
-                {searchLink(formatDate('%Y', entry.date), `year:${entry.date.substr(0, 4)}`)}
+                <DateFormat entry={entry} format={dateFormat} searchLink={searchLink}/>
               </p>
               <p>
-                {formatDate('%H:%M:%S', entry.date)}
+                {formatDate(timeFormat, entry.date)}
               </p>
             </div>
           </div>
@@ -172,14 +212,14 @@ export const Details = ({entry, dispatch}) => {
               ))}
             </div>
           </div>
-          { (hasAddress(entry) || hasGeo(entry)) && (
+          { !disabledFlags.includes('map') && (hasAddress(entry) || hasGeo(entry)) && (
             <div className="flex">
               <div className="flex-shrink-0 w-8">
                 <FontAwesomeIcon icon={icons.faMapPin} className="text-gray-300"/>
               </div>
               <div>
                 {entry.road && (
-                  <p>{simpleSearchLink(entry.road, 'location', entry.road)}</p>
+                  <p>{simpleSearchLink(entry.road, 'road', entry.road)}</p>
                 )}
                 {entry.city && (
                   <p>{simpleSearchLink(entry.city, 'city', entry.city)}</p>
@@ -193,7 +233,19 @@ export const Details = ({entry, dispatch}) => {
               </div>
             </div>
           )}
-          <div className="flex">
+          { !!entry.description && (
+            <>
+              <div className="flex">
+                <div className="flex-shrink-0 w-8">
+                  <FontAwesomeIcon icon={icons.faNewspaper} className="text-gray-300"/>
+                </div>
+                <div>
+                  <p className="inline-flex flex-wrap gap-2">{entry.description}</p>
+                </div>
+              </div>
+            </>
+          )}
+          {!disabledFlags.includes('tag') && (entry.tags?.length > 0 || !(disabledFlags.includes('edit') || disabledFeatures.includes('edit'))) && (<div className="flex">
             <div className="flex-shrink-0 w-8">
               <FontAwesomeIcon icon={icons.faTags} className="text-gray-300"/>
             </div>
@@ -202,7 +254,7 @@ export const Details = ({entry, dispatch}) => {
                 {entry.tags.map(tag => (
                   <a className="px-2 py-1 text-gray-300 bg-gray-800 rounded hover:bg-gray-700 hover:text-gray-200 hover:cursor-pointer" onClick={() => dispatchSearch(`${queryTerm("tag", tag)}`)} title={`Search for tag ${tag}`}>{tag}</a>
                 ))}
-                {!appConfig.disabledEdit && (
+                {!disabledFlags.includes('edit') && !disabledFeatures?.includes('edit') && (
                   <a className="flex items-center gap-2 px-2 py-1 text-gray-500 bg-transparent border border-gray-700 rounded group inset-1 hover:bg-gray-700 hover:text-gray-200 hover:cursor-pointer active:bg-gray-600" onClick={editTags} title={`Edit single tags`}>
                     <FontAwesomeIcon icon={icons.faPen} className="text-gray-500 group-hover:text-gray-300"/>
                     <span>Edit tags</span>
@@ -210,7 +262,7 @@ export const Details = ({entry, dispatch}) => {
                 )}
               </p>
             </div>
-          </div>
+          </div>)}
           <div className="flex">
             <div className="flex-shrink-0 w-8">
               <FontAwesomeIcon icon={icons.faCamera} className="text-gray-300"/>
@@ -229,10 +281,10 @@ export const Details = ({entry, dispatch}) => {
                   )}
                 </p>
               )}
-              <p>ISO {entry.iso}, Aperture {entry.aperture}</p>
+              <p>ISO {entry.iso}, Aperture {entry.aperture}, Shutter Speed {entry.ShutterSpeedRaw}, Focal Length {entry.focalLength}mm</p>
             </div>
           </div>
-          {entry.objects.length > 0 && (
+          { !disabledFlags.includes('annotation') && entry.objects?.length > 0 && (
             <div className="flex">
               <div className="flex-shrink-0 w-8">
                 <FontAwesomeIcon icon={icons.faShapes} className="text-gray-300"/>
@@ -244,7 +296,7 @@ export const Details = ({entry, dispatch}) => {
               </div>
             </div>
           )}
-          {entry.faces.length > 0 && (
+          { !disabledFlags.includes('annotation') && !!entry.faces && entry.faces.length > 0 && (
             <div className="flex">
               <div className="flex-shrink-0 w-8">
                 <FontAwesomeIcon icon={icons.faUser} className="text-gray-300"/>
@@ -256,9 +308,71 @@ export const Details = ({entry, dispatch}) => {
               </div>
             </div>
           )}
+          <div className="flex">
+            <div className="flex-shrink-0 w-8">
+              <FontAwesomeIcon icon={icons.faShareNodes} className="text-gray-300"/>
+            </div>
+            <div>
+              <p className="inline-flex flex-wrap gap-2">
+                  <a className="flex items-center gap-2 px-1 py-0 text-gray-500 bg-transparent border border-gray-700 rounded group inset-1 hover:bg-gray-700 hover:text-gray-200 hover:cursor-pointer active:bg-gray-600" onClick={copyShareUrlToClipboard} href={getShareUrl()} title={`Click to copy shareable link to clipboard`}>
+                    <span>Share media</span>
+                  </a>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </>
   )
 }
 
+function DateFormat({entry, format, searchLink}) {
+  const result: React.ReactNode[] = []
+
+  if (!entry?.date) {
+    return result
+  }
+
+  let last = 0;
+  let pos = format.indexOf('%', last)
+
+  while (pos >= 0 && pos < format.length - 1) {
+    if (pos > last) {
+      const head = (<span className="px-1">{format.substring(last, pos)}</span>)
+      result.push(head)
+    }
+    const code = format.substring(pos, pos + 2)
+
+    let link: React.JSX.Element | null = null
+    switch (code) {
+      case '%Y':
+        link = searchLink(formatDate(code, entry.date), `year:${entry.date.substr(0, 4)}`)
+        break
+      case '%y':
+        link = searchLink(formatDate(code, entry.date), `year:${entry.date.substr(0, 4)}`)
+        break
+      case '%m':
+        link = searchLink(formatDate(code, entry.date), `year:${entry.date.substr(0, 4)} month:${entry.date.substr(5, 2)}`)
+        break
+      case '%d':
+        link = searchLink(formatDate(code, entry.date), `year:${entry.date.substr(0, 4)} month:${entry.date.substr(5, 2)} day:${entry.date.substr(8, 2)}`)
+        break
+      default:
+        link = <span className="px-1">{formatDate(code, entry.date)}</span>
+    }
+
+    if (link) {
+      result.push(link)
+    }
+
+    last = pos + 2
+    pos = format.indexOf('%', last)
+  }
+
+  if (last < format.length) {
+    const tail = (<span className="px-1">{format.substring(last)}</span>)
+    result.push(tail)
+  }
+
+  return result
+}

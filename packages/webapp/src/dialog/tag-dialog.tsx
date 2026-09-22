@@ -7,7 +7,7 @@ import { useEventStore } from '../store/event-store'
 import { useEntryStore } from '../store/entry-store'
 import { useEditModeStore } from '../store/edit-mode-store'
 import { TagInput } from "./tag-input";
-import { Tag } from "../api/models";
+import { type Tag } from "../api/models";
 import { RecentTags } from "./recent-tags";
 import { UsedTags } from "./used-tags";
 import { MultiTagHelp, SingleTagHelp } from "./tag-dialog-help";
@@ -59,19 +59,29 @@ const useAllTags = () => {
 }
 
 const Dialog = ({title, submitText, onCancel, onSubmit, children}) => {
+
+  let [expanded, setExpanded] = useState(true);
+  const minimize = (ev) => {
+    ev.preventDefault();
+    setExpanded(!expanded);
+  }
+
   return (
     <div className={'fixed left-0 top-0 bottom-0 right-0 max-dvh z-30 outline-none flex justify-center items-center'}>
       <div className="fixed top-0 bottom-0 left-0 right-0 bg-gray-700/50" />
       <div className="fixed top-0 bottom-0 left-0 right-0 flex items-center justify-center p-2">
-        <form autoComplete="off" onSubmit={onSubmit} className="overflow-hidden flex flex-col w-[40rem] max-w-full max-h-full bg-gray-800 border border-gray-950 rounded-md">
+        <form autoComplete="off" onSubmit={onSubmit} className="overflow-hidden flex flex-col w-[40rem] max-w-full max-h-full bg-gray-800 border border-gray-950 rounded-md ">
           <div className="flex items-center justify-between flex-shrink-0 p-4 align-middle">
             <h3 className="text-gray-300">{title}</h3>
-            <button className="flex items-center justify-center w-8 h-8 rounded cursor-pointer hover:bg-gray-700 active:bg-gray-600" onClick={onCancel}><FontAwesomeIcon icon={icons.faXmark} className="text-gray-400"/></button>
+            <div className="flex">
+              <button className="flex items-center justify-center w-8 h-8 rounded cursor-pointer hover:bg-gray-700 active:bg-gray-600" onClick={minimize}><FontAwesomeIcon icon={expanded ? icons.faCaretDown : icons.faCaretUp} className="text-gray-400"/></button>
+              <button className="flex items-center justify-center w-8 h-8 rounded cursor-pointer hover:bg-gray-700 active:bg-gray-600" onClick={onCancel}><FontAwesomeIcon icon={icons.faXmark} className="text-gray-400"/></button>
+            </div>
           </div>
-          <div className="p-4 pt-0 overflow-y-auto">
+          <div className={"p-4 pt-0 overflow-y-auto " + (expanded ? '' : 'hidden')}>
             {children}
           </div>
-          <div className="flex flex-row-reverse flex-shrink-0 gap-4 px-4 py-2 bg-gray-700">
+          <div className={"flex flex-row-reverse flex-shrink-0 gap-4 px-4 py-2 bg-gray-700 " + (expanded ? '' : 'hidden')}>
             <button className="px-4 py-2 border rounded bg-primary-400 border-primary-700 hover:bg-primary-500 hover:cursor-pointer">{submitText}</button>
             <a className="px-4 py-2 text-gray-300 bg-transparent rounded hover:bg-gray-500 hover:text-gray-200 hover:cursor-pointer" onClick={onCancel}>Cancel</a>
           </div>
@@ -117,7 +127,7 @@ export const MultiTagDialog = ({onCancel, onSubmit}: TagDialogProps) => {
           <a className="w-6 h-6 ml-1 hover:cursor-pointer" onClick={() => setShowHelp(show => !show)} title="Show help for tag input"><FontAwesomeIcon icon={icons.faQuestionCircle} className="text-gray-500 hover:text-gray-300"/></a>
         </label>
         <MultiTagHelp show={showHelp} setShow={setShowHelp} />
-        <TagInput tags={state.tags} withRemove={true} suggestions={state.suggestions} showSuggestions={state.showSuggestions} dispatch={dispatch} value={state.inputValue} />
+        <TagInput tags={state.tags} withRemove={true} suggestions={state.suggestions} showSuggestions={state.showSuggestions} dispatch={dispatch} value={state.inputValue} onSubmit={submitHandler} onCancel={onCancel} />
         <RecentTags tags={recentTags} dispatch={dispatch} />
         <UsedTags title="Tags of selected media:" tags={selectedTags} initialCount={15} dispatch={dispatch} />
         <UsedTags title="Most used tags:" tags={allTags} initialCount={5} dispatch={dispatch} />
@@ -158,7 +168,7 @@ export const SingleTagDialog = ({tags, onCancel, onSubmit}: TagDialogProps) => {
           <a className="w-6 h-6 ml-1 hover:cursor-pointer" onClick={() => setShowHelp(show => !show)} title="Show help for tag input"><FontAwesomeIcon icon={icons.faQuestionCircle} className="text-gray-500 hover:text-gray-300"/></a>
         </label>
         <SingleTagHelp show={showHelp} setShow={setShowHelp} />
-        <TagInput tags={state.tags} withRemove={false} suggestions={state.suggestions} showSuggestions={state.showSuggestions} dispatch={dispatch} value={state.inputValue} />
+        <TagInput tags={state.tags} withRemove={false} suggestions={state.suggestions} showSuggestions={state.showSuggestions} dispatch={dispatch} value={state.inputValue} onSubmit={submitHandler} onCancel={onCancel} />
         <RecentTags tags={recentTags} dispatch={dispatch} />
         <UsedTags title="Most used tags:" tags={allTags} initialCount={5} dispatch={dispatch} />
       </div>

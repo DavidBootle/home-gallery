@@ -1,16 +1,17 @@
 {
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
   "compilerOptions": {
-      "target": "es2015",
-      "module": "es2015",
-      "jsx": "react",
-      "moduleResolution": "node",
-      "lib": [
-          "dom",
-          "es5",
-          "es6"
-      ]
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "include": [
-      "src/**/*.{ts,tsx}"
-  ]
 }

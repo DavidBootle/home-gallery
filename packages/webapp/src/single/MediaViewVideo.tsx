@@ -61,6 +61,8 @@ export const MediaViewVideo = (props) => {
         dispatch({type: 'next'})
       } else if (ev.direction === Hammer.DIRECTION_RIGHT) {
         dispatch({type: 'prev'})
+      } else if (ev.direction === Hammer.DIRECTION_DOWN || ev.direction === Hammer.DIRECTION_UP) {
+        dispatch({type: 'list'})
       }
     }
 
@@ -91,7 +93,7 @@ export const MediaViewVideo = (props) => {
   return (
     <>
       <div className="flex items-center justify-center w-full h-full">
-        <video ref={ref} controls poster={posterUrl} className="w-full h-full">
+        <video ref={ref} controls playsinline poster={posterUrl} className="w-full h-full">
           <source src={videoUrl} type={videoMime} />
           No native video element support. Watch video file from <a href={videoUrl}>here</a>
         </video>

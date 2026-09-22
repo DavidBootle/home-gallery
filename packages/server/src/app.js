@@ -9,13 +9,20 @@ import { loggerMiddleware } from './logger-middleware.js'
 import { databaseApi } from './api/database/index.js';
 import { treeApi } from './api/database/tree/index.js';
 import { eventsApi } from './api/events/index.js';
+import { sourcesApi } from './api/sources.js';
 import { webapp } from './webapp.js';
 import { augmentReqByUserMiddleware, createBasicAuthMiddleware, defaultIpWhitelistRules } from './auth/index.js'
-import { isIndex, skipIf } from './utils.js'
+import { isIndex, skipIf, browserBasePath, routerPrefix } from './utils.js'
 import { debugApi } from './api/debug/index.js'
+import { browserPlugins } from './browser-plugins.js';
+import Logger from '@home-gallery/logger';
+import { webappMiddleware } from './webapp-middleware.js';
+import { socialMetaTagsMiddleware } from './social-meta-tags-middleware.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const webappDir = path.join(__dirname, 'public')
+
+const log = Logger('server.app')
 
 function shouldCompress (req, res) {
   if (req.headers['x-no-compression']) {
@@ -34,90 +41,55 @@ const getAuthMiddleware = config => {
   return (req, _, next) => next()
 }
 
-export function createApp(context) {
+/**
+ * @param {import('./types.js').TServerContext} context
+ */
+export async function createApp(context) {
   const { config } = context
-  const app = express();
+  const app = context.app = express();
   app.disable('x-powered-by')
-  app.enable('trust proxy')
+  if (config?.server?.trustProxy) {
+    const trustProxy = config?.server?.trustProxy
+    log.info(`Trust proxy ${trustProxy}`)
+    app.enable('trust proxy', trustProxy)
+  }
 
   app.use(augmentReqByUserMiddleware())
   app.use(loggerMiddleware())
-  app.use(cors());
-  app.use(compression({ filter: shouldCompress }))
 
-  app.use(skipIf(express.static(webappDir, {maxAge: '1h'}), isIndex))
+  const router = context.router = express.Router()
+  router.use(cors());
+  router.use(compression({ filter: shouldCompress }))
 
-  app.use(getAuthMiddleware(config))
+  router.use(skipIf(express.static(webappDir, {maxAge: '1h'}), isIndex))
 
-  app.use('/files', express.static(config.storage.dir, {index: false, maxAge: '2d', immutable: true}));
-  // app.use('/rawimage', express.static(config.sources.dir, {index: false, maxAge: '2d', immutable: true}))
-  app.use(bodyParser.json({limit: '1mb'}))
+  router.use(getAuthMiddleware(config))
 
-  const { read: readEvents, push: pushEvent, stream, getEvents } = eventsApi(context, config.events.file);
-  const { read: readDatabase, init: initDatabase, getFirstEntries, getDatabase } = databaseApi(context, config.database.file, getEvents);
-  const { read: readTree } = treeApi(context, getDatabase);
+  router.use('/files', express.static(config.storage.dir, {index: false, maxAge: '2d', immutable: true}));
 
-  app.get('/api/events.json', readEvents);
-  app.get('/api/events/stream', stream);
-  app.post('/api/events', pushEvent);
-  app.get('/api/database.json', readDatabase);
-  app.get('/api/database/tree/:hash', readTree);
-  app.get('/api/config', (req, res) => {
-    res.json(config);
-  });
+  await browserPlugins(context)
 
-  if (config.server.remoteConsoleToken) {
-    const { console } = debugApi({remoteConsoleToken: config.server?.remoteConsoleToken})
-    app.post('/api/debug/console', console);
+  router.use(bodyParser.json({limit: '1mb'}))
+
+  await eventsApi(context)
+  await databaseApi(context)
+  await treeApi(context)
+  await sourcesApi(context)
+  await debugApi(context)
+
+  await webappMiddleware(context)
+  await socialMetaTagsMiddleware(context)
+  await webapp(context)
+
+  const prefix = routerPrefix(config.server?.prefix)
+  app.use(prefix, router)
+
+  if (prefix != '/') {
+    log.info(`Set prefix to ${prefix}`)
+    app.get('/', (_, res) => res.redirect(prefix))
   }
-
-  // add direct link to download raw photos
-  app.get('/api/rawphoto/:filename', (req, res) => {
-    const filename = req.params.filename;
-
-    if (!filename) {
-      res.sendStatus(404);
-      return;
-    }
-    
-    // decode URI to get standard characters, including spaces
-    const decodedName = decodeURI(filename);
-
-    // remove all preceding file elements to avoid a get api having full access to all files on the server
-   const decodedSafeName = decodedName.substring(decodedName.lastIndexOf('/') + 1);
-    
-    res.sendFile(`/data/Pictures/${decodedSafeName}`, (err) => {
-      if (!res.headersSent) {
-        res.statusCode = 500;
-        res.send(`Error occurred accessing file: ${err}`);
-      }
-      return;
-    })
-
-  });
-
-  // deprecated
-  app.get('/api/database', readDatabase);
-  app.get('/api/events', readEvents);
-
-  const getWebAppState = async (req) => {
-    const disabled = config?.webapp?.disabled || []
-    const entries = await getFirstEntries(50, req)
-    return {
-      disabled: !!req.username ? [...disabled, 'pwa'] : disabled,
-      entries
-    }
-  }
-
-  const webAppOptions = {
-    basePath: (config.server.basePath || '').replaceAll(/\/+/g, '') + '/',
-    injectRemoteConsole: !!config.server.remoteConsoleToken,
-  }
-
-  app.use(webapp(webappDir, getWebAppState, webAppOptions))
 
   return {
-    app,
-    initDatabase
+    app
   }
 }

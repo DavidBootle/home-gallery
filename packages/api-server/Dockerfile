@@ -1,4 +1,4 @@
-FROM node:20
+FROM node:24 AS builder
 
 WORKDIR /app
 
@@ -9,6 +9,11 @@ COPY src ./src
 COPY *.js ./
 
 RUN node download-models.js
+
+FROM node:24
+
+WORKDIR /app
+COPY --from=builder /app ./
 
 EXPOSE 3000
 
