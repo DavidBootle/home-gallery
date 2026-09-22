@@ -13,7 +13,7 @@
         "title": {
           "type": "string",
           "description": "Title of the webapp",
-          "default": "Home Gallery"
+          "default": "Bootle Photo Gallery"
         },
         "pluginManager": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",

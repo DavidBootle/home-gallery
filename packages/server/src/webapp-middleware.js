@@ -19,7 +19,7 @@ export async function webappMiddleware(context) {
 
   const staticState = {
     ...config?.webapp,
-    title: config.webapp?.title || 'Home Gallery',
+    title: config.webapp?.title || 'Bootle Photo Gallery',
     disabled: config.webapp?.disabled || [],
     pluginManager: {
       plugins: pluginEntries

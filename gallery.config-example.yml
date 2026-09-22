@@ -312,8 +312,8 @@
 #webapp:
   # Title of the webapp
   #
-  # default: 'Home Gallery'
-  #title: 'Home Gallery'
+  # default: 'Bootle Photo Gallery'
+  #title: 'Bootle Photo Gallery'
   #pluginManager:
     #
     # List of plugin urls to load

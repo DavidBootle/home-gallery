@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { type AppConfig } from "./AppConfig";
 
 const defaultConfig: AppConfig = {
-  title: 'Home Gallery',
+  title: 'Bootle Photo Gallery',
   disabled: [],
   pluginManager: {
     plugins: []
