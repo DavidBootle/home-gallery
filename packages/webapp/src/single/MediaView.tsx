@@ -66,6 +66,11 @@ export const MediaView = () => {
   const dimensions = useBodyDimensions();
 
   const entries = useEntryStore(state => state.entries);
+  const injectedEntries = ((appConfig.entries || []) as typeof entries).map(entry => ({
+    ...entry,
+    shortId: entry.shortId || entry.id.substring(0, 12),
+  }));
+  const mediaEntries = entries.length ? entries : injectedEntries;
   const lastIndex = useSingleViewStore(state => state.lastIndex);
   const showDetails = useSingleViewStore(state => state.showDetails);
   const showAnnotations = useSingleViewStore(state => state.showAnnotations);
@@ -82,11 +87,11 @@ export const MediaView = () => {
 
   const [hotkeys, hotkeyToAction] = useMediaViewHotkeys();
 
-  let index = findEntryIndex(location, entries, id);
+  let index = findEntryIndex(location, mediaEntries, id);
 
-  const current = entries[index];
-  const prev = entries[index - 1];
-  const next = entries[index + 1];
+  const current = mediaEntries[index];
+  const prev = mediaEntries[index - 1];
+  const next = mediaEntries[index + 1];
 
   const isImage = current && (current.type === 'image' || current.type === 'rawImage');
   const isVideo = current && (current.type === 'video')
@@ -98,7 +103,7 @@ export const MediaView = () => {
   useEffect(() => { index >= 0 && setLastIndex(index) }, [index])
 
   const viewEntry = (index: number) => {
-    const { shortId } = entries[index]
+    const { shortId } = mediaEntries[index]
     navigate(`/view/${shortId}`, {state: {index, listLocation}, replace: true});
   }
 
@@ -106,12 +111,12 @@ export const MediaView = () => {
     const { type } = action
     let prevNextMatch = type.match(/(prev|next)(-(\d+))?/)
     if (type === 'index') {
-      const i = Math.min(entries.length - 1, Math.max(0, action.index))
+      const i = Math.min(mediaEntries.length - 1, Math.max(0, action.index))
       viewEntry(i)
-    } else if (prevNextMatch && entries.length) {
+    } else if (prevNextMatch && mediaEntries.length) {
       const offset = prevNextMatch[3] ? +prevNextMatch[3] : 1
       const negate = prevNextMatch[1] == 'prev' ? -1 : 1
-      const i = Math.min(entries.length - 1, Math.max(0, index + (negate * offset)))
+      const i = Math.min(mediaEntries.length - 1, Math.max(0, index + (negate * offset)))
       viewEntry(i)
     } else if (type === 'similar' && current?.similarityHash && !disableFlags.includes('annotation')) {
       navigate(`/similar/${current.shortId}`);
@@ -121,10 +126,10 @@ export const MediaView = () => {
       setShowAnnotations(!showAnnotations);
     } else if (type === 'toggleNavigation') {
       setShowNavigation(!showNavigation);
-    } else if (type == 'first' && entries.length) {
+    } else if (type == 'first' && mediaEntries.length) {
       viewEntry(0)
-    } else if (type == 'last' && entries.length) {
-      viewEntry(entries.length - 1)
+    } else if (type == 'last' && mediaEntries.length) {
+      viewEntry(mediaEntries.length - 1)
     } else if (type == 'list') {
       navigate(`${listLocation.pathname}${listLocation.search ? encodeUrl(listLocation.search) : ''}`, {state: {id: current?.id}});
     } else if (type == 'chronology') {
@@ -164,11 +169,11 @@ export const MediaView = () => {
     ev.preventDefault()
   }, [index, showDetails, showAnnotations, showNavigation])
 
-  const mediaVanishes = index < 0 && lastIndex >= 0 && entries.length > 0
+  const mediaVanishes = index < 0 && lastIndex >= 0 && mediaEntries.length > 0
   if (mediaVanishes) {
     dispatch({type: 'index', index: lastIndex})
   }
-  const listBecomesEmpty = entries.length == 0 && lastIndex >= 0
+  const listBecomesEmpty = mediaEntries.length == 0 && lastIndex >= 0
   if (listBecomesEmpty) {
     dispatch({type: 'list'})
   }
